@@ -16,6 +16,7 @@
 // under the License.
 
 use std::env;
+use std::path::PathBuf;
 
 fn main() {
     let mut vec_flags = vec![];
@@ -65,5 +66,32 @@ fn main() {
             builder.flag(flag.as_str());
         }
         builder.compile("minidfs");
+    }
+
+    // build ffi for libhdfs and libminidfs
+    {
+        let (header, output) = ("c_src/wrapper.h", "hdfs-native.rs");
+        // Tell cargo to invalidate the built crate whenever the wrapper changes
+        println!("cargo:rerun-if-changed={}", header);
+        println!("cargo:rerun-if-changed={}", "c_src/libhdfs/hdfs.h");
+        println!(
+            "cargo:rerun-if-changed={}",
+            "c_src/libminidfs/native_mini_dfs.h"
+        );
+
+        let bindings = bindgen::Builder::default()
+            .header(header)
+            .allowlist_function("nmd.*")
+            .allowlist_function("hdfs.*")
+            .allowlist_function("hadoop.*")
+            .clang_args(vec_flags)
+            .rustified_enum("tObjectKind")
+            .generate()
+            .expect("Unable to generate bindings");
+
+        let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+        bindings
+            .write_to_file(out_path.join(output))
+            .expect("Couldn't write bindings!");
     }
 }
