@@ -15,12 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-
-mod native;
-
-pub mod err;
-/// Rust APIs wrapping libhdfs API, providing better semantic and abstraction
-pub mod hdfs;
+/// Errors which can occur during accessing Hdfs cluster
+pub enum HdfsErr {
+    Unknown,
+    /// file path
+    FileNotFound(String),
+    /// file path           
+    FileAlreadyExists(String),
+    /// name node address
+    CannotConnectToNameNode(String),
+    /// URL
+    InvalidUrl(String),
+}

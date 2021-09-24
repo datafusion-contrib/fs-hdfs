@@ -1,0 +1,711 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+//! it's a modified version of hdfs-rs
+use std::collections::HashMap;
+use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
+use std::rc::Rc;
+use std::string::String;
+use std::sync::RwLock;
+
+use lazy_static::lazy_static;
+use libc::{c_char, c_int, c_short, c_void, time_t};
+use log::info;
+use url::Url;
+
+pub use crate::err::HdfsErr;
+use crate::native::*;
+
+const O_RDONLY: c_int = 0;
+const O_WRONLY: c_int = 1;
+const O_APPEND: c_int = 1024;
+
+lazy_static! {
+    static ref HDFS_CACHE: RwLock<HashMap<String, HdfsFs>> = RwLock::new(HashMap::new());
+}
+
+/// Hdfs Filesystem
+///
+/// It is basically thread safe because the native API for hdfsFs is thread-safe.
+#[derive(Clone)]
+pub struct HdfsFs {
+    url: String,
+    raw: hdfsFS,
+    _marker: PhantomData<()>,
+}
+
+impl HdfsFs {
+    /// Create instance of HdfsFs with a global cache.
+    /// For each namenode uri, only one instance will be created
+    pub fn new(path: &str) -> Result<HdfsFs, HdfsErr> {
+        let namenode_uri = get_namenode_uri(path)?;
+
+        {
+            // Get if exists
+            let cache = HDFS_CACHE.read().unwrap();
+            let ret = cache.get(&namenode_uri);
+            if let Some(hdfs_fs) = ret {
+                return Ok(hdfs_fs.clone());
+            }
+        }
+
+        let mut cache = HDFS_CACHE.write().unwrap();
+        let ret = cache.get(&namenode_uri);
+        return if let Some(hdfs_fs) = ret {
+            // Check again if exists
+            Ok(hdfs_fs.clone())
+        } else {
+            let hdfs_fs = unsafe {
+                let hdfs_builder = hdfsNewBuilder();
+                let cstr_uri = CString::new(namenode_uri.as_bytes()).unwrap();
+                hdfsBuilderSetNameNode(hdfs_builder, cstr_uri.as_ptr());
+                info!("Connecting to Namenode ({})", &namenode_uri);
+                hdfsBuilderConnect(hdfs_builder)
+            };
+
+            if hdfs_fs.is_null() {
+                return Err(HdfsErr::CannotConnectToNameNode(namenode_uri.clone()));
+            }
+
+            let hdfs_fs = HdfsFs {
+                url: namenode_uri.clone(),
+                raw: hdfs_fs,
+                _marker: PhantomData,
+            };
+            cache.insert(namenode_uri.clone(), hdfs_fs.clone());
+            Ok(hdfs_fs)
+        };
+    }
+
+    /// Get HDFS namenode url
+    #[inline]
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Create HdfsFile from hdfsFile
+    fn new_hdfs_file(&self, path: &str, file: hdfsFile) -> Result<HdfsFile, HdfsErr> {
+        if file.is_null() {
+            Err(HdfsErr::Unknown)
+        } else {
+            Ok(HdfsFile {
+                fs: self.clone(),
+                path: path.to_owned(),
+                file,
+                _marker: PhantomData,
+            })
+        }
+    }
+
+    /// open a file to read
+    #[inline]
+    pub fn open(&self, path: &str) -> Result<HdfsFile, HdfsErr> {
+        self.open_with_buf_size(path, 0)
+    }
+
+    /// open a file to read with a buffer size
+    pub fn open_with_buf_size(
+        &self,
+        path: &str,
+        buf_size: i32,
+    ) -> Result<HdfsFile, HdfsErr> {
+        let file = unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsOpenFile(
+                self.raw,
+                cstr_path.as_ptr(),
+                O_RDONLY,
+                buf_size as c_int,
+                0,
+                0,
+            )
+        };
+
+        self.new_hdfs_file(path, file)
+    }
+
+    /// Get the file status, including file size, last modified time, etc
+    pub fn get_file_status(&self, path: &str) -> Result<FileStatus, HdfsErr> {
+        let ptr = unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsGetPathInfo(self.raw, cstr_path.as_ptr())
+        };
+
+        if ptr.is_null() {
+            Err(HdfsErr::Unknown)
+        } else {
+            Ok(FileStatus::new(ptr))
+        }
+    }
+
+    /// Get the file status for each entry under the specified directory
+    pub fn list_status(&self, path: &str) -> Result<Vec<FileStatus>, HdfsErr> {
+        let mut entry_num: c_int = 0;
+
+        let ptr = unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsListDirectory(self.raw, cstr_path.as_ptr(), &mut entry_num)
+        };
+
+        if ptr.is_null() {
+            return Err(HdfsErr::Unknown);
+        }
+
+        let shared_ptr = Rc::new(HdfsFileInfoPtr::new_array(ptr, entry_num));
+
+        let mut list = Vec::new();
+        for idx in 0..entry_num {
+            list.push(FileStatus::from_array(shared_ptr.clone(), idx as u32));
+        }
+
+        Ok(list)
+    }
+
+    /// Get the default blocksize.
+    pub fn default_blocksize(&self) -> Result<usize, HdfsErr> {
+        let block_sz = unsafe { hdfsGetDefaultBlockSize(self.raw) };
+
+        if block_sz > 0 {
+            Ok(block_sz as usize)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Get the default blocksize at the filesystem indicated by a given path.
+    pub fn block_size(&self, path: &str) -> Result<usize, HdfsErr> {
+        let block_sz = unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsGetDefaultBlockSizeAtPath(self.raw, cstr_path.as_ptr())
+        };
+
+        if block_sz > 0 {
+            Ok(block_sz as usize)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Return the raw capacity of the filesystem.
+    pub fn capacity(&self) -> Result<usize, HdfsErr> {
+        let block_sz = unsafe { hdfsGetCapacity(self.raw) };
+
+        if block_sz > 0 {
+            Ok(block_sz as usize)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Return the total raw size of all files in the filesystem.
+    pub fn used(&self) -> Result<usize, HdfsErr> {
+        let block_sz = unsafe { hdfsGetUsed(self.raw) };
+
+        if block_sz > 0 {
+            Ok(block_sz as usize)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Checks if a given path exsits on the filesystem
+    pub fn exist(&self, path: &str) -> bool {
+        (unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsExists(self.raw, cstr_path.as_ptr())
+        } == 0)
+    }
+
+    /// Get hostnames where a particular block (determined by
+    /// pos & blocksize) of a file is stored. The last element in the array
+    /// is NULL. Due to replication, a single block could be present on
+    /// multiple hosts.
+    pub fn get_hosts(
+        &self,
+        path: &str,
+        start: usize,
+        length: usize,
+    ) -> Result<BlockHosts, HdfsErr> {
+        let ptr = unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsGetHosts(
+                self.raw,
+                cstr_path.as_ptr(),
+                start as tOffset,
+                length as tOffset,
+            )
+        };
+
+        if !ptr.is_null() {
+            Ok(BlockHosts { ptr })
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    #[inline]
+    pub fn create(&self, path: &str) -> Result<HdfsFile, HdfsErr> {
+        self.create_with_params(path, false, 0, 0, 0)
+    }
+
+    #[inline]
+    pub fn create_with_overwrite(
+        &self,
+        path: &str,
+        overwrite: bool,
+    ) -> Result<HdfsFile, HdfsErr> {
+        self.create_with_params(path, overwrite, 0, 0, 0)
+    }
+
+    pub fn create_with_params(
+        &self,
+        path: &str,
+        overwrite: bool,
+        buf_size: i32,
+        replica_num: i16,
+        block_size: i32,
+    ) -> Result<HdfsFile, HdfsErr> {
+        if !overwrite && self.exist(path) {
+            return Err(HdfsErr::FileAlreadyExists(path.to_owned()));
+        }
+
+        let file = unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsOpenFile(
+                self.raw,
+                cstr_path.as_ptr(),
+                O_WRONLY,
+                buf_size as c_int,
+                replica_num as c_short,
+                block_size as tSize,
+            )
+        };
+
+        self.new_hdfs_file(path, file)
+    }
+
+    /// set permission
+    pub fn chmod(&self, path: &str, mode: i16) -> bool {
+        (unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsChmod(self.raw, cstr_path.as_ptr(), mode as c_short)
+        }) == 0
+    }
+
+    pub fn chown(&self, path: &str, owner: &str, group: &str) -> bool {
+        (unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            let cstr_owner = CString::new(owner).unwrap();
+            let cstr_group = CString::new(group).unwrap();
+            hdfsChown(
+                self.raw,
+                cstr_path.as_ptr(),
+                cstr_owner.as_ptr(),
+                cstr_group.as_ptr(),
+            )
+        }) == 0
+    }
+
+    /// Open a file for append
+    pub fn append(&self, path: &str) -> Result<HdfsFile, HdfsErr> {
+        if !self.exist(path) {
+            return Err(HdfsErr::FileNotFound(path.to_owned()));
+        }
+
+        let file = unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsOpenFile(self.raw, cstr_path.as_ptr(), O_APPEND, 0, 0, 0)
+        };
+
+        self.new_hdfs_file(path, file)
+    }
+
+    /// create a directory
+    pub fn mkdir(&self, path: &str) -> Result<bool, HdfsErr> {
+        if unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsCreateDirectory(self.raw, cstr_path.as_ptr())
+        } == 0
+        {
+            Ok(true)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Rename file.
+    pub fn rename(&self, old_path: &str, new_path: &str) -> Result<bool, HdfsErr> {
+        if unsafe {
+            let cstr_old_path = CString::new(old_path).unwrap();
+            let cstr_new_path = CString::new(new_path).unwrap();
+            hdfsRename(self.raw, cstr_old_path.as_ptr(), cstr_new_path.as_ptr())
+        } == 0
+        {
+            Ok(true)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Set the replication of the specified file to the supplied value
+    pub fn set_replication(&self, path: &str, num: i16) -> Result<bool, HdfsErr> {
+        if unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsSetReplication(self.raw, cstr_path.as_ptr(), num as i16)
+        } == 0
+        {
+            Ok(true)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Delete file.
+    pub fn delete(&self, path: &str, recursive: bool) -> Result<bool, HdfsErr> {
+        if unsafe {
+            let cstr_path = CString::new(path).unwrap();
+            hdfsDelete(self.raw, cstr_path.as_ptr(), recursive as c_int)
+        } == 0
+        {
+            Ok(true)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+}
+
+/// since HDFS client handles are completely thread safe, here we implement Send+Sync trait for HdfsFs
+unsafe impl Send for HdfsFs {}
+
+unsafe impl Sync for HdfsFs {}
+
+/// open hdfs file
+#[derive(Clone)]
+pub struct HdfsFile {
+    fs: HdfsFs,
+    path: String,
+    file: hdfsFile,
+    _marker: PhantomData<()>,
+}
+
+impl HdfsFile {
+    /// Get HdfsFs
+    #[inline]
+    pub fn fs(&self) -> &HdfsFs {
+        &self.fs
+    }
+
+    /// Return a file path
+    #[inline]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn available(&self) -> Result<bool, HdfsErr> {
+        if unsafe { hdfsAvailable(self.fs.raw, self.file) } == 0 {
+            Ok(true)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Close the opened file
+    pub fn close(&self) -> Result<bool, HdfsErr> {
+        if unsafe { hdfsCloseFile(self.fs.raw, self.file) } == 0 {
+            Ok(true)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Flush the data.
+    pub fn flush(&self) -> bool {
+        (unsafe { hdfsFlush(self.fs.raw, self.file) }) == 0
+    }
+
+    /// Flush out the data in client's user buffer. After the return of this
+    /// call, new readers will see the data.
+    pub fn hflush(&self) -> bool {
+        (unsafe { hdfsHFlush(self.fs.raw, self.file) }) == 0
+    }
+
+    /// Similar to posix fsync, Flush out the data in client's
+    /// user buffer. all the way to the disk device (but the disk may have
+    /// it in its cache).
+    pub fn hsync(&self) -> bool {
+        (unsafe { hdfsHSync(self.fs.raw, self.file) }) == 0
+    }
+
+    /// Determine if a file is open for read.
+    pub fn is_readable(&self) -> bool {
+        (unsafe { hdfsFileIsOpenForRead(self.file) }) == 1
+    }
+
+    /// Determine if a file is open for write.
+    pub fn is_writable(&self) -> bool {
+        (unsafe { hdfsFileIsOpenForWrite(self.file) }) == 1
+    }
+
+    /// Get the file status, including file size, last modified time, etc
+    pub fn get_file_status(&self) -> Result<FileStatus, HdfsErr> {
+        self.fs.get_file_status(self.path())
+    }
+
+    /// Get the current offset in the file, in bytes.
+    pub fn pos(&self) -> Result<u64, HdfsErr> {
+        let pos = unsafe { hdfsTell(self.fs.raw, self.file) };
+
+        if pos > 0 {
+            Ok(pos as u64)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Read data from an open file.
+    pub fn read(&self, buf: &mut [u8]) -> Result<i32, HdfsErr> {
+        let read_len = unsafe {
+            hdfsRead(
+                self.fs.raw,
+                self.file,
+                buf.as_ptr() as *mut c_void,
+                buf.len() as tSize,
+            )
+        };
+
+        if read_len > 0 {
+            Ok(read_len as i32)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Positional read of data from an open file.
+    pub fn read_with_pos(&self, pos: i64, buf: &mut [u8]) -> Result<i32, HdfsErr> {
+        let read_len = unsafe {
+            hdfsPread(
+                self.fs.raw,
+                self.file,
+                pos as tOffset,
+                buf.as_ptr() as *mut c_void,
+                buf.len() as tSize,
+            )
+        };
+
+        if read_len > 0 {
+            Ok(read_len as i32)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+
+    /// Seek to given offset in file.
+    pub fn seek(&self, offset: u64) -> bool {
+        (unsafe { hdfsSeek(self.fs.raw, self.file, offset as tOffset) }) == 0
+    }
+
+    /// Write data into an open file.
+    pub fn write(&self, buf: &[u8]) -> Result<i32, HdfsErr> {
+        let written_len = unsafe {
+            hdfsWrite(
+                self.fs.raw,
+                self.file,
+                buf.as_ptr() as *mut c_void,
+                buf.len() as tSize,
+            )
+        };
+
+        if written_len > 0 {
+            Ok(written_len)
+        } else {
+            Err(HdfsErr::Unknown)
+        }
+    }
+}
+
+/// Interface that represents the client side information for a file or directory.
+pub struct FileStatus {
+    raw: Rc<HdfsFileInfoPtr>,
+    idx: u32,
+    _marker: PhantomData<()>,
+}
+
+impl FileStatus {
+    /// create FileStatus from *const hdfsFileInfo
+    #[inline]
+    fn new(ptr: *const hdfsFileInfo) -> FileStatus {
+        FileStatus {
+            raw: Rc::new(HdfsFileInfoPtr::new(ptr)),
+            idx: 0,
+            _marker: PhantomData,
+        }
+    }
+
+    /// create FileStatus from *const hdfsFileInfo which points
+    /// to dynamically allocated array.
+    #[inline]
+    fn from_array(raw: Rc<HdfsFileInfoPtr>, idx: u32) -> FileStatus {
+        FileStatus {
+            raw,
+            idx,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Get the pointer to hdfsFileInfo
+    #[inline]
+    fn ptr(&self) -> *const hdfsFileInfo {
+        unsafe { self.raw.ptr.offset(self.idx as isize) }
+    }
+
+    /// Get the name of the file
+    #[inline]
+    pub fn name(&self) -> &str {
+        let slice = unsafe { CStr::from_ptr((&*self.ptr()).mName) }.to_bytes();
+        std::str::from_utf8(slice).unwrap()
+    }
+
+    /// Is this a file?
+    #[inline]
+    pub fn is_file(&self) -> bool {
+        match unsafe { &*self.ptr() }.mKind {
+            tObjectKind::kObjectKindFile => true,
+            tObjectKind::kObjectKindDirectory => false,
+        }
+    }
+
+    /// Is this a directory?
+    #[inline]
+    pub fn is_directory(&self) -> bool {
+        match unsafe { &*self.ptr() }.mKind {
+            tObjectKind::kObjectKindFile => false,
+            tObjectKind::kObjectKindDirectory => true,
+        }
+    }
+
+    /// Get the owner of the file
+    #[inline]
+    pub fn owner(&self) -> &str {
+        let slice = unsafe { CStr::from_ptr((&*self.ptr()).mOwner) }.to_bytes();
+        std::str::from_utf8(slice).unwrap()
+    }
+
+    /// Get the group associated with the file
+    #[inline]
+    pub fn group(&self) -> &str {
+        let slice = unsafe { CStr::from_ptr((&*self.ptr()).mGroup) }.to_bytes();
+        std::str::from_utf8(slice).unwrap()
+    }
+
+    /// Get the permissions associated with the file
+    #[inline]
+    pub fn permission(&self) -> i16 {
+        unsafe { &*self.ptr() }.mPermissions as i16
+    }
+
+    /// Get the length of this file, in bytes.
+    #[inline]
+    pub fn len(&self) -> usize {
+        unsafe { &*self.ptr() }.mSize as usize
+    }
+
+    /// Get the block size of the file.
+    #[inline]
+    pub fn block_size(&self) -> usize {
+        unsafe { &*self.ptr() }.mBlockSize as usize
+    }
+
+    /// Get the replication factor of a file.
+    #[inline]
+    pub fn replica_count(&self) -> i16 {
+        unsafe { &*self.ptr() }.mReplication as i16
+    }
+
+    /// Get the last modification time for the file in seconds
+    #[inline]
+    pub fn last_modified(&self) -> time_t {
+        unsafe { &*self.ptr() }.mLastMod
+    }
+
+    /// Get the last access time for the file in seconds
+    #[inline]
+    pub fn last_access(&self) -> time_t {
+        unsafe { &*self.ptr() }.mLastAccess
+    }
+}
+
+/// Safely deallocable hdfsFileInfo pointer
+struct HdfsFileInfoPtr {
+    pub ptr: *const hdfsFileInfo,
+    pub len: i32,
+}
+
+/// for safe deallocation
+impl<'a> Drop for HdfsFileInfoPtr {
+    fn drop(&mut self) {
+        unsafe { hdfsFreeFileInfo(self.ptr as *mut hdfsFileInfo, self.len) };
+    }
+}
+
+impl HdfsFileInfoPtr {
+    fn new(ptr: *const hdfsFileInfo) -> HdfsFileInfoPtr {
+        HdfsFileInfoPtr { ptr, len: 1 }
+    }
+
+    pub fn new_array(ptr: *const hdfsFileInfo, len: i32) -> HdfsFileInfoPtr {
+        HdfsFileInfoPtr { ptr, len }
+    }
+}
+
+/// Includes hostnames where a particular block of a file is stored.
+pub struct BlockHosts {
+    ptr: *mut *mut *mut c_char,
+}
+
+impl Drop for BlockHosts {
+    fn drop(&mut self) {
+        unsafe { hdfsFreeHosts(self.ptr) };
+    }
+}
+
+const LOCAL_FS_SCHEME: &'static str = "file";
+const HDFS_FS_SCHEME: &'static str = "hdfs";
+
+#[inline]
+fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
+    match Url::parse(path) {
+        Ok(url) => match url.scheme() {
+            LOCAL_FS_SCHEME => Ok("file:///".to_string()),
+            HDFS_FS_SCHEME => {
+                if let Some(host) = url.host() {
+                    let mut uri_builder = String::new();
+                    uri_builder.push_str(&(format!("{}://{}", HDFS_FS_SCHEME, host)));
+
+                    if let Some(port) = url.port() {
+                        uri_builder.push_str(&(format!(":{}", port)));
+                    }
+                    Ok(uri_builder)
+                } else {
+                    Err(HdfsErr::InvalidUrl(path.to_string()))
+                }
+            }
+            _ => Err(HdfsErr::InvalidUrl(path.to_string())),
+        },
+        Err(_) => Err(HdfsErr::InvalidUrl(path.to_string())),
+    }
+}
