@@ -24,3 +24,5 @@ mod native;
 pub mod err;
 /// Rust APIs wrapping libhdfs API, providing better semantic and abstraction
 pub mod hdfs;
+/// Mainly for unit test
+pub mod minidfs;
