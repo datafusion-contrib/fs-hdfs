@@ -15,17 +15,26 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
+use crate::minidfs::{new_mini_dfs_conf, MiniDFS};
+use std::panic;
 
-mod native;
+fn hdfs_setup() -> MiniDFS {
+    let mut conf = new_mini_dfs_conf();
+    MiniDFS::start(&mut conf).unwrap()
+}
+fn hdfs_teardown(dfs: MiniDFS) {
+    dfs.stop();
+}
 
-pub mod err;
-/// Rust APIs wrapping libhdfs API, providing better semantic and abstraction
-pub mod hdfs;
-/// Mainly for unit test
-pub mod minidfs;
+pub fn run_hdfs_test<T>(test: T) -> ()
+where
+    T: FnOnce(&MiniDFS) -> () + panic::UnwindSafe,
+{
+    let dfs = hdfs_setup();
 
-#[cfg(test)]
-pub mod test;
+    let result = panic::catch_unwind(|| test(&dfs));
+
+    hdfs_teardown(dfs);
+
+    assert!(result.is_ok())
+}
