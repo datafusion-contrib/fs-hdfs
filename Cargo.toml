@@ -16,3 +16,6 @@ readme = "README.md"
 [lib]
 name = "hdfs"
 path = "src/lib.rs"
+
+[build-dependencies]
+cc = "1.0"
