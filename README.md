@@ -20,7 +20,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-fs-hdfs = "0.1.0"
+fs-hdfs = "0.1.1"
 ```
 
 fs-hdfs uses libhdfs. Firstly, we need to add library path to find the libhdfs. An example for MacOS,

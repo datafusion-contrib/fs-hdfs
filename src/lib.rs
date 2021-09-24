@@ -32,7 +32,7 @@
 //!
 //! ```ignore
 //! [dependencies]
-//! fs-hdfs = "0.1.0"
+//! fs-hdfs = "0.1.1"
 //! ```
 //! or
 //!
