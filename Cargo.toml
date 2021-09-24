@@ -1,0 +1,18 @@
+[package]
+name = "fs-hdfs"
+version = "0.1.0"
+edition = "2018"
+
+description = "libhdfs binding library and safe Rust APIs"
+authors = ["Yanghong Zhong <nju_yaho@apache.org>"]
+license = "Apache-2.0"
+
+keywords = ["hdfs", "hadoop"]
+documentation = "https://yahonanjing.github.io/fs-hdfs"
+homepage = "https://github.com/yahoNanJing/fs-hdfs"
+repository = "https://github.com/yahoNanJing/fs-hdfs"
+readme = "README.md"
+
+[lib]
+name = "hdfs"
+path = "src/lib.rs"

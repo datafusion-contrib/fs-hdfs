@@ -1,0 +1,25 @@
+.vscode
+.idea/
+
+# Compiled source
+*.a
+*.dll
+*.o
+*.py[ocd]
+*.so
+*.so.*
+*.bundle
+*.dylib
+
+# Generated Visual Studio files
+*.vcxproj
+*.vcxproj.*
+*.sln
+*.iml
+
+# macOS
+.DS_Store
+
+# Rust
+target
+Cargo.lock
