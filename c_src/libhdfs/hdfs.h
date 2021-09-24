@@ -72,10 +72,14 @@ extern  "C" {
      * Some utility decls used in libhdfs.
      */
     struct hdfsBuilder;
-    typedef int32_t   tSize; /// size of data for read/write io ops 
-    typedef time_t    tTime; /// time type in seconds
-    typedef int64_t   tOffset;/// offset within the file
-    typedef uint16_t  tPort; /// port
+    /// size of data for read/write io ops
+    typedef int32_t   tSize;
+    /// time type in seconds
+    typedef time_t    tTime;
+    /// offset within the file
+    typedef int64_t   tOffset;
+    /// port
+    typedef uint16_t  tPort;
     typedef enum tObjectKind {
         kObjectKindFile = 'F',
         kObjectKindDirectory = 'D',
@@ -285,16 +289,12 @@ extern  "C" {
      *
      * @param bld  The HDFS builder
      * @param nn   The NameNode to use.
-     *
      *             If the string given is 'default', the default NameNode
      *             configuration will be used (from the XML configuration files)
-     *
      *             If NULL is given, a LocalFileSystem will be created.
-     *
      *             If the string starts with a protocol type such as file:// or
      *             hdfs://, this protocol type will be used.  If not, the
      *             hdfs:// protocol type will be used.
-     *
      *             You may specify a NameNode port in the usual way by 
      *             passing a string of the format hdfs://<hostname>:<port>.
      *             Alternately, you may set the port with
@@ -1019,7 +1019,6 @@ extern  "C" {
      *                   hadoopRzBufferGet.  If you have reached EOF, the data
      *                   within the hadoopRzBuffer will be NULL.  You must still
      *                   free hadoopRzBuffer instances containing NULL.
-     *
      *                   On failure, we will return NULL plus an errno code.
      *                   errno = EOPNOTSUPP indicates that we could not do a
      *                   zero-copy read, and there was no ByteBufferPool
