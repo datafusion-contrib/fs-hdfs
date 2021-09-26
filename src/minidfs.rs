@@ -33,7 +33,7 @@ impl MiniDFS {
 
     pub fn stop(&self) {
         unsafe {
-            nmdShutdown(self.cluster);
+            nmdShutdownClean(self.cluster);
             nmdFree(self.cluster);
         }
     }
