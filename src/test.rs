@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use crate::hdfs::HdfsFs;
 use crate::minidfs::{new_mini_dfs_conf, MiniDFS};
 use std::panic;
 
@@ -37,4 +38,10 @@ where
     hdfs_teardown(dfs);
 
     assert!(result.is_ok())
+}
+
+pub fn get_hdfs(dfs: &MiniDFS) -> HdfsFs {
+    let port = dfs.namenode_port().unwrap();
+    let minidfs_addr = format!("hdfs://localhost:{}", port);
+    HdfsFs::new(minidfs_addr.as_str()).ok().unwrap()
 }

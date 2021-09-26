@@ -106,6 +106,12 @@ impl HdfsFs {
         &self.url
     }
 
+    /// Get a raw pointer of JNI API's HdfsFs
+    #[inline]
+    pub fn raw(&self) -> hdfsFS {
+        self.raw
+    }
+
     /// Create HdfsFile from hdfsFile
     fn new_hdfs_file(&self, path: &str, file: hdfsFile) -> Result<HdfsFile, HdfsErr> {
         if file.is_null() {

@@ -96,3 +96,5 @@ pub mod minidfs;
 
 #[cfg(test)]
 pub mod test;
+
+pub mod util;

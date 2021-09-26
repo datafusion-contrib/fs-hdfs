@@ -32,3 +32,5 @@ log = "^0.4"
 
 [dev-dependencies]
 uuid = {version = "^0.8", features = ["v4"]}
+tempfile = "^3.2"
+filepath = "^0.1"
