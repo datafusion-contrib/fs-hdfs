@@ -14,7 +14,8 @@
 //! Hdfs Utility
 
 use crate::err::HdfsErr;
-use crate::hdfs::HdfsFs;
+use crate::hdfs::{get_uri, HdfsFs, HDFS_FS_SCHEME, LOCAL_FS_SCHEME};
+use crate::minidfs::MiniDFS;
 use crate::native::{hdfsCopy, hdfsMove};
 use std::ffi::CString;
 
@@ -22,6 +23,62 @@ use std::ffi::CString;
 pub struct HdfsUtil;
 
 impl HdfsUtil {
+    /// Copy file to hdfs
+    pub fn copy_file_to_hdfs(
+        dfs: &MiniDFS,
+        src_path: &str,
+        dst_path: &str,
+    ) -> Result<bool, HdfsErr> {
+        let src_uri = get_uri(src_path)?;
+        let src_fs = HdfsFs::new(src_uri.as_str())?;
+
+        let dst_fs = dfs.get_hdfs()?;
+
+        HdfsUtil::copy(&src_fs, src_path, &dst_fs, dst_path)
+    }
+
+    /// Copy file from hdfs
+    pub fn copy_file_from_hdfs(
+        dfs: &MiniDFS,
+        src_path: &str,
+        dst_path: &str,
+    ) -> Result<bool, HdfsErr> {
+        let src_fs = dfs.get_hdfs()?;
+
+        let dst_uri = get_uri(dst_path)?;
+        let dst_fs = HdfsFs::new(dst_uri.as_str())?;
+
+        HdfsUtil::copy(&src_fs, src_path, &dst_fs, dst_path)
+    }
+
+    /// Move file to hdfs
+    pub fn mv_file_to_hdfs(
+        dfs: &MiniDFS,
+        src_path: &str,
+        dst_path: &str,
+    ) -> Result<bool, HdfsErr> {
+        let src_uri = get_uri(src_path)?;
+        let src_fs = HdfsFs::new(src_uri.as_str())?;
+
+        let dst_fs = dfs.get_hdfs()?;
+
+        HdfsUtil::mv(&src_fs, src_path, &dst_fs, dst_path)
+    }
+
+    /// Move file from hdfs
+    pub fn mv_file_from_hdfs(
+        dfs: &MiniDFS,
+        src_path: &str,
+        dst_path: &str,
+    ) -> Result<bool, HdfsErr> {
+        let src_fs = dfs.get_hdfs()?;
+
+        let dst_uri = get_uri(dst_path)?;
+        let dst_fs = HdfsFs::new(dst_uri.as_str())?;
+
+        HdfsUtil::mv(&src_fs, src_path, &dst_fs, dst_path)
+    }
+
     /// Copy file from one filesystem to another.
     ///
     /// #### Params
@@ -88,7 +145,7 @@ impl HdfsUtil {
 #[cfg(test)]
 mod test {
     use crate::hdfs::HdfsFs;
-    use crate::test::{get_hdfs, run_hdfs_test};
+    use crate::test::run_hdfs_test;
 
     use super::*;
     use std::fs;
@@ -105,29 +162,32 @@ mod test {
 
         run_hdfs_test(|dfs| {
             // Source
-            let src_fs =
-                HdfsFs::new(format!("file://{}", src_path.to_str().unwrap()).as_str())
-                    .ok()
-                    .unwrap();
+            let src_fs = HdfsFs::new(
+                format!("{}://{}", LOCAL_FS_SCHEME, src_path.to_str().unwrap()).as_str(),
+            )
+            .ok()
+            .unwrap();
 
             // Destination
             let dst_file = format!("/{}", src_file_name);
-            let dst_fs = get_hdfs(dfs);
+            let dst_fs = dfs.get_hdfs().ok().unwrap();
 
             assert!(
-                HdfsUtil::copy(&src_fs, src_file, &dst_fs, dst_file.as_str())
+                HdfsUtil::copy_file_to_hdfs(dfs, src_file, dst_file.as_str())
                     .ok()
                     .unwrap()
             );
             assert!(dst_fs.exist(dst_file.as_str()));
+            assert!(src_fs.exist(src_file));
             assert!(Path::new(src_file).exists());
 
             assert!(dst_fs.delete(dst_file.as_str(), false).ok().unwrap());
 
-            assert!(HdfsUtil::mv(&src_fs, src_file, &dst_fs, dst_file.as_str())
+            assert!(HdfsUtil::mv_file_to_hdfs(dfs, src_file, dst_file.as_str())
                 .ok()
                 .unwrap());
             assert!(dst_fs.exist(dst_file.as_str()));
+            assert!(!src_fs.exist(src_file));
             assert!(!Path::new(src_file).exists());
         });
     }
@@ -143,28 +203,33 @@ mod test {
         run_hdfs_test(|dfs| {
             // Source
             let src_file = format!("/{}", file_name);
-            let src_fs = get_hdfs(dfs);
+            let src_fs = dfs.get_hdfs().ok().unwrap();
             src_fs.create(src_file.as_str()).ok().unwrap();
 
             // Destination
-            let dst_fs = HdfsFs::new(format!("file://{}", dst_file).as_str())
-                .ok()
-                .unwrap();
+            let dst_fs =
+                HdfsFs::new(format!("{}://{}", LOCAL_FS_SCHEME, dst_file).as_str())
+                    .ok()
+                    .unwrap();
 
             assert!(
-                HdfsUtil::copy(&src_fs, src_file.as_str(), &dst_fs, dst_file)
+                HdfsUtil::copy_file_from_hdfs(dfs, src_file.as_str(), dst_file)
                     .ok()
                     .unwrap()
             );
             assert!(src_fs.exist(src_file.as_str()));
+            assert!(dst_fs.exist(dst_file));
             assert!(Path::new(dst_file).exists());
 
-            fs::remove_file(dst_file);
+            fs::remove_file(dst_file).unwrap();
 
-            assert!(HdfsUtil::mv(&src_fs, src_file.as_str(), &dst_fs, dst_file)
-                .ok()
-                .unwrap());
+            assert!(
+                HdfsUtil::mv_file_from_hdfs(dfs, src_file.as_str(), dst_file)
+                    .ok()
+                    .unwrap()
+            );
             assert!(!src_fs.exist(src_file.as_str()));
+            assert!(dst_fs.exist(dst_file));
             assert!(Path::new(dst_file).exists());
         });
     }

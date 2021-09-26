@@ -17,6 +17,8 @@ use std::ffi;
 use std::mem;
 use std::str;
 
+use crate::err::HdfsErr;
+use crate::hdfs::HdfsFs;
 use crate::native::*;
 
 pub struct MiniDFS {
@@ -32,6 +34,8 @@ impl MiniDFS {
     }
 
     pub fn stop(&self) {
+        // remove hdfs from global cache
+        HdfsFs::remove(self.namenode_addr().as_str()).ok();
         unsafe {
             nmdShutdownClean(self.cluster);
             nmdFree(self.cluster);
@@ -53,6 +57,14 @@ impl MiniDFS {
         }
     }
 
+    pub fn namenode_addr(&self) -> String {
+        if let Some(port) = self.namenode_port() {
+            format!("hdfs://localhost:{}", port)
+        } else {
+            "hdfs://localhost".to_string()
+        }
+    }
+
     pub fn namenode_http_addr(&self) -> Option<(&str, i32)> {
         let mut hostname: *const c_char = unsafe { mem::zeroed() };
         let mut port: c_int = 0;
@@ -71,6 +83,10 @@ impl MiniDFS {
 
     pub fn set_hdfs_builder(&self, builder: *mut hdfsBuilder) -> bool {
         (unsafe { nmdConfigureHdfsBuilder(self.cluster, builder) } == 0)
+    }
+
+    pub fn get_hdfs(&self) -> Result<HdfsFs, HdfsErr> {
+        HdfsFs::new(self.namenode_addr().as_str())
     }
 }
 

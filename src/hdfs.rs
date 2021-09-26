@@ -100,6 +100,16 @@ impl HdfsFs {
         HdfsFs::new("default")
     }
 
+    pub fn remove(path: &str) -> Result<Option<HdfsFs>, HdfsErr> {
+        let namenode_uri = match path {
+            "default" => String::from("default"),
+            _ => get_namenode_uri(path)?,
+        };
+
+        let mut cache = HDFS_CACHE.write().unwrap();
+        Ok(cache.remove(namenode_uri.as_str()))
+    }
+
     /// Get HDFS namenode url
     #[inline]
     pub fn url(&self) -> &str {
@@ -697,8 +707,8 @@ impl Drop for BlockHosts {
     }
 }
 
-const LOCAL_FS_SCHEME: &'static str = "file";
-const HDFS_FS_SCHEME: &'static str = "hdfs";
+pub const LOCAL_FS_SCHEME: &'static str = "file";
+pub const HDFS_FS_SCHEME: &'static str = "hdfs";
 
 #[inline]
 fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
@@ -718,6 +728,22 @@ fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
                     Err(HdfsErr::InvalidUrl(path.to_string()))
                 }
             }
+            _ => Err(HdfsErr::InvalidUrl(path.to_string())),
+        },
+        Err(_) => Err(HdfsErr::InvalidUrl(path.to_string())),
+    }
+}
+
+#[inline]
+pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
+    let path = if path.starts_with("/") {
+        format!("{}://{}", LOCAL_FS_SCHEME, path)
+    } else {
+        path.to_string()
+    };
+    match Url::parse(&path) {
+        Ok(url) => match url.scheme() {
+            LOCAL_FS_SCHEME | HDFS_FS_SCHEME => Ok(url.to_string()),
             _ => Err(HdfsErr::InvalidUrl(path.to_string())),
         },
         Err(_) => Err(HdfsErr::InvalidUrl(path.to_string())),
@@ -755,8 +781,7 @@ mod test {
     #[test]
     fn test_hdfs() {
         run_hdfs_test(|dfs| {
-            let port = dfs.namenode_port().unwrap();
-            let minidfs_addr = format!("hdfs://localhost:{}", port);
+            let minidfs_addr = dfs.namenode_addr();
 
             // create a file, check existence, and close
             let fs = HdfsFs::new(minidfs_addr.as_str()).ok().unwrap();
@@ -779,7 +804,7 @@ mod test {
 
             let file_info = fs.get_file_status("/dir1").ok().unwrap();
 
-            let expected_path = format!("hdfs://localhost:{}/dir1", port);
+            let expected_path = format!("{}/dir1", minidfs_addr);
             assert_eq!(&expected_path, file_info.name());
             assert!(!file_info.is_file());
             assert!(file_info.is_directory());
@@ -788,7 +813,7 @@ mod test {
             let mut expected_list = Vec::new();
             for x in 0..sub_dir_num {
                 let filename = format!("/dir1/{}", x);
-                expected_list.push(format!("hdfs://localhost:{}/dir1/{}", port, x));
+                expected_list.push(format!("{}/dir1/{}", minidfs_addr, x));
 
                 match fs.mkdir(&filename) {
                     Ok(_) => println!("/dir1.x created"),

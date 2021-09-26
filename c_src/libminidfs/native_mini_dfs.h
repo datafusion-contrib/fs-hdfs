@@ -83,19 +83,17 @@ struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf);
 int nmdWaitClusterUp(struct NativeMiniDfsCluster *cl);
 
 /**
- * Shut down a NativeMiniDFS cluster
+ * Shut down a NativeMiniDFS cluster without deleting hdfs directory
  *
  * @param cl        The cluster
- *
- * @param deleteDfsDir 0 not to delete hdfs directory; a non-zero error code to delete hdfs directory
  *
  * @return          0 on success; a non-zero error code if an exception is
  *                  thrown.
  */
-int nmdShutdown(struct NativeMiniDfsCluster *cl, jboolean jdeleteDfsDir);
+int nmdShutdown(struct NativeMiniDfsCluster *cl);
 
 /**
- * Shut down a NativeMiniDFS cluster with delete hdfs directory
+ * Shut down a NativeMiniDFS cluster with deleting hdfs directory
  *
  * @param cl        The cluster
  *
