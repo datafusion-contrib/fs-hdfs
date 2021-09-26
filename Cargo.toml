@@ -17,6 +17,9 @@ readme = "README.md"
 name = "hdfs"
 path = "src/lib.rs"
 
+[features]
+use_existing_hdfs = []
+
 [build-dependencies]
 cc = "1.0"
 bindgen = "^0.59"
@@ -26,3 +29,6 @@ lazy_static = "^1.4"
 libc = "^0.2"
 url = "^2.2"
 log = "^0.4"
+
+[dev-dependencies]
+uuid = {version = "^0.8", features = ["v4"]}

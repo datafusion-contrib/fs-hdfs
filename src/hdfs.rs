@@ -53,7 +53,10 @@ impl HdfsFs {
     /// Create instance of HdfsFs with a global cache.
     /// For each namenode uri, only one instance will be created
     pub fn new(path: &str) -> Result<HdfsFs, HdfsErr> {
-        let namenode_uri = get_namenode_uri(path)?;
+        let namenode_uri = match path {
+            "default" => String::from("default"),
+            _ => get_namenode_uri(path)?,
+        };
 
         {
             // Get if exists
@@ -90,6 +93,11 @@ impl HdfsFs {
             cache.insert(namenode_uri.clone(), hdfs_fs.clone());
             Ok(hdfs_fs)
         };
+    }
+
+    /// The default NameNode configuration will be used (from the XML configuration files)
+    pub fn default() -> Result<HdfsFs, HdfsErr> {
+        HdfsFs::new("default")
     }
 
     /// Get HDFS namenode url
@@ -714,6 +722,29 @@ fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
 mod test {
     use crate::hdfs::HdfsFs;
     use crate::test::run_hdfs_test;
+
+    #[cfg(use_existing_hdfs)]
+    use uuid::Uuid;
+
+    #[test]
+    fn test_hdfs_default() {
+        #[cfg(use_existing_hdfs)]
+        {
+            let fs = HdfsFs::default().ok().unwrap();
+
+            let uuid = Uuid::new_v4().to_string();
+            let test_file = uuid.as_str();
+            let created_file = match fs.create(test_file) {
+                Ok(f) => f,
+                Err(_) => panic!("Couldn't create a file"),
+            };
+            assert!(created_file.close().is_ok());
+            assert!(fs.exist(test_file));
+
+            fs.delete(test_file, false);
+            assert!(!fs.exist(test_file));
+        }
+    }
 
     #[test]
     fn test_hdfs() {
