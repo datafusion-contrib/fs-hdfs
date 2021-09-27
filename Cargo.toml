@@ -18,6 +18,8 @@ name = "hdfs"
 path = "src/lib.rs"
 
 [features]
+default = ["test_util"]
+test_util = []
 use_existing_hdfs = []
 
 [build-dependencies]

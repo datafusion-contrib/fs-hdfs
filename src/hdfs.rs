@@ -755,24 +755,22 @@ mod test {
     use crate::minidfs::get_dfs;
     use uuid::Uuid;
 
+    #[cfg(feature = "use_existing_hdfs")]
     #[test]
     fn test_hdfs_default() {
-        #[cfg(use_existing_hdfs)]
-        {
-            let fs = super::HdfsFs::default().ok().unwrap();
+        let fs = super::HdfsFs::default().ok().unwrap();
 
-            let uuid = Uuid::new_v4().to_string();
-            let test_file = uuid.as_str();
-            let created_file = match fs.create(test_file) {
-                Ok(f) => f,
-                Err(_) => panic!("Couldn't create a file"),
-            };
-            assert!(created_file.close().is_ok());
-            assert!(fs.exist(test_file));
+        let uuid = Uuid::new_v4().to_string();
+        let test_file = uuid.as_str();
+        let created_file = match fs.create(test_file) {
+            Ok(f) => f,
+            Err(_) => panic!("Couldn't create a file"),
+        };
+        assert!(created_file.close().is_ok());
+        assert!(fs.exist(test_file));
 
-            fs.delete(test_file, false);
-            assert!(!fs.exist(test_file));
-        }
+        assert!(fs.delete(test_file, false).is_ok());
+        assert!(!fs.exist(test_file));
     }
 
     #[test]

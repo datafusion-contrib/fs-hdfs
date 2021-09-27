@@ -14,7 +14,7 @@
 //! Hdfs Utility
 
 use crate::err::HdfsErr;
-use crate::hdfs::{get_uri, HdfsFs, LOCAL_FS_SCHEME};
+use crate::hdfs::{get_uri, HdfsFs};
 use crate::minidfs::MiniDFS;
 use crate::native::{hdfsCopy, hdfsMove};
 use std::ffi::CString;
@@ -216,7 +216,7 @@ mod test {
             src_fs.create(&src_file).ok().unwrap();
 
             // Destination
-            let dst_file_uri = format!("{}://{}", LOCAL_FS_SCHEME, dst_file);
+            let dst_file_uri = format!("file://{}", dst_file);
             let dst_fs = HdfsFs::new(&dst_file_uri).ok().unwrap();
 
             // Test copy
