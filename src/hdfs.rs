@@ -107,7 +107,7 @@ impl HdfsFs {
         };
 
         let mut cache = HDFS_CACHE.write().unwrap();
-        Ok(cache.remove(namenode_uri.as_str()))
+        Ok(cache.remove(&namenode_uri))
     }
 
     /// Get HDFS namenode url
@@ -752,17 +752,14 @@ pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
 
 #[cfg(test)]
 mod test {
-    use crate::hdfs::HdfsFs;
-
     use crate::minidfs::get_dfs;
-    #[cfg(use_existing_hdfs)]
     use uuid::Uuid;
 
     #[test]
     fn test_hdfs_default() {
         #[cfg(use_existing_hdfs)]
         {
-            let fs = HdfsFs::default().ok().unwrap();
+            let fs = super::HdfsFs::default().ok().unwrap();
 
             let uuid = Uuid::new_v4().to_string();
             let test_file = uuid.as_str();
@@ -783,54 +780,70 @@ mod test {
         let dfs = get_dfs();
         {
             let minidfs_addr = dfs.namenode_addr();
+            let fs = dfs.get_hdfs().ok().unwrap();
 
-            // create a file, check existence, and close
-            let fs = HdfsFs::new(minidfs_addr.as_str()).ok().unwrap();
-            let test_file = "/test_file";
-            let created_file = match fs.create(test_file) {
-                Ok(f) => f,
-                Err(_) => panic!("Couldn't create a file"),
-            };
-            assert!(created_file.close().is_ok());
-            assert!(fs.exist(test_file));
-
-            // open a file and close
-            let opened_file = fs.open(test_file).ok().unwrap();
-            assert!(opened_file.close().is_ok());
-
-            match fs.mkdir("/dir1") {
-                Ok(_) => println!("/dir1 created"),
-                Err(_) => panic!("Couldn't create /dir1 directory"),
-            };
-
-            let file_info = fs.get_file_status("/dir1").ok().unwrap();
-
-            let expected_path = format!("{}/dir1", minidfs_addr);
-            assert_eq!(&expected_path, file_info.name());
-            assert!(!file_info.is_file());
-            assert!(file_info.is_directory());
-
-            let sub_dir_num = 3;
-            let mut expected_list = Vec::new();
-            for x in 0..sub_dir_num {
-                let filename = format!("/dir1/{}", x);
-                expected_list.push(format!("{}/dir1/{}", minidfs_addr, x));
-
-                match fs.mkdir(&filename) {
-                    Ok(_) => println!("/dir1.x created"),
-                    Err(_) => panic!("Couldn't create /dir1 directory"),
+            // Test hadoop file
+            {
+                // create a file, check existence, and close
+                let uuid = Uuid::new_v4().to_string();
+                let test_file = uuid.as_str();
+                let created_file = match fs.create(test_file) {
+                    Ok(f) => f,
+                    Err(_) => panic!("Couldn't create a file"),
                 };
+                assert!(created_file.close().is_ok());
+                assert!(fs.exist(test_file));
+
+                // open a file and close
+                let opened_file = fs.open(test_file).ok().unwrap();
+                assert!(opened_file.close().is_ok());
+
+                // Clean up
+                assert!(fs.delete(test_file, false).is_ok());
             }
 
-            let mut list = fs.list_status("/dir1").ok().unwrap();
-            assert_eq!(sub_dir_num, list.len());
-
-            list.sort_by(|a, b| Ord::cmp(a.name(), b.name()));
-            for (expected, name) in expected_list
-                .iter()
-                .zip(list.iter().map(|status| status.name()))
+            // Test directory
             {
-                assert_eq!(expected, name);
+                let uuid = Uuid::new_v4().to_string();
+                let test_dir = format!("/{}", uuid);
+
+                match fs.mkdir(&test_dir) {
+                    Ok(_) => println!("{} created", test_dir),
+                    Err(_) => panic!("Couldn't create {} directory", test_dir),
+                };
+
+                let file_info = fs.get_file_status(&test_dir).ok().unwrap();
+
+                let expected_path = format!("{}{}", minidfs_addr, test_dir);
+                assert_eq!(&expected_path, file_info.name());
+                assert!(!file_info.is_file());
+                assert!(file_info.is_directory());
+
+                let sub_dir_num = 3;
+                let mut expected_list = Vec::new();
+                for x in 0..sub_dir_num {
+                    let filename = format!("{}/{}", test_dir, x);
+                    expected_list.push(format!("{}{}/{}", minidfs_addr, test_dir, x));
+
+                    match fs.mkdir(&filename) {
+                        Ok(_) => println!("{} created", filename),
+                        Err(_) => panic!("Couldn't create {} directory", filename),
+                    };
+                }
+
+                let mut list = fs.list_status(&test_dir).ok().unwrap();
+                assert_eq!(sub_dir_num, list.len());
+
+                list.sort_by(|a, b| Ord::cmp(a.name(), b.name()));
+                for (expected, name) in expected_list
+                    .iter()
+                    .zip(list.iter().map(|status| status.name()))
+                {
+                    assert_eq!(expected, name);
+                }
+
+                // Clean up
+                assert!(fs.delete(&test_dir, true).is_ok());
             }
         }
     }

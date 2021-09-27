@@ -71,6 +71,7 @@ impl MiniDFS {
         }
     }
 
+    #[allow(dead_code)]
     fn wait_for_clusterup(&self) -> bool {
         if unsafe { nmdWaitClusterUp(self.cluster) } == 0 {
             true
