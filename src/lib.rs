@@ -91,10 +91,8 @@ mod native;
 pub mod err;
 /// Rust APIs wrapping libhdfs API, providing better semantic and abstraction
 pub mod hdfs;
+#[cfg(test)]
 /// Mainly for unit test
 pub mod minidfs;
-
 #[cfg(test)]
-pub mod test;
-
 pub mod util;

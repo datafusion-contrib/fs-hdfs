@@ -753,8 +753,8 @@ pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
 #[cfg(test)]
 mod test {
     use crate::hdfs::HdfsFs;
-    use crate::test::run_hdfs_test;
 
+    use crate::minidfs::get_dfs;
     #[cfg(use_existing_hdfs)]
     use uuid::Uuid;
 
@@ -780,7 +780,8 @@ mod test {
 
     #[test]
     fn test_hdfs() {
-        run_hdfs_test(|dfs| {
+        let dfs = get_dfs();
+        {
             let minidfs_addr = dfs.namenode_addr();
 
             // create a file, check existence, and close
@@ -831,6 +832,6 @@ mod test {
             {
                 assert_eq!(expected, name);
             }
-        })
+        }
     }
 }
