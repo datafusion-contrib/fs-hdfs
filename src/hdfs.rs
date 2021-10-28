@@ -752,8 +752,9 @@ pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
 
 #[cfg(test)]
 mod test {
-    use crate::minidfs::get_dfs;
     use uuid::Uuid;
+
+    use crate::minidfs::get_dfs;
 
     #[cfg(feature = "use_existing_hdfs")]
     #[test]

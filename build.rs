@@ -19,79 +19,135 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let mut vec_flags = vec![];
+    let vec_flags = &get_build_flags();
 
-    // Pre check environment variables
-    {
-        // for jvm
-        match env::var("JAVA_HOME") {
-            Ok(val) => {
-                vec_flags.push(format!("-I{}/include", val));
-                if cfg!(target_os = "linux") {
-                    vec_flags.push(format!("-I{}/include/linux", val));
-                } else if cfg!(target_os = "macos") {
-                    vec_flags.push(format!("-I{}/include/darwin", val));
-                }
-                // Tell cargo to tell rustc to link the system jvm shared library.
-                println!("cargo:rustc-link-search=native={}/jre/lib/server", val);
-                println!("cargo:rustc-link-lib=jvm");
+    build_hdfs_lib(vec_flags);
+
+    build_minidfs_lib(vec_flags);
+
+    build_ffi(vec_flags);
+}
+
+fn build_ffi(flags: &Vec<String>) {
+    let (header, output) = ("c_src/wrapper.h", "hdfs-native.rs");
+    // Tell cargo to invalidate the built crate whenever the wrapper changes
+    println!("cargo:rerun-if-changed={}", header);
+    println!("cargo:rerun-if-changed={}", get_hdfs_file_path("hdfs.h"));
+    println!(
+        "cargo:rerun-if-changed={}",
+        get_minidfs_file_path("native_mini_dfs.h")
+    );
+
+    let bindings = bindgen::Builder::default()
+        .header(header)
+        .allowlist_function("nmd.*")
+        .allowlist_function("hdfs.*")
+        .allowlist_function("hadoop.*")
+        .clang_args(flags)
+        .rustified_enum("tObjectKind")
+        .generate()
+        .expect("Unable to generate bindings");
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join(output))
+        .expect("Couldn't write bindings!");
+}
+
+fn build_hdfs_lib(flags: &Vec<String>) {
+    println!("cargo:rerun-if-changed={}", get_hdfs_file_path("hdfs.c"));
+
+    let mut builder = cc::Build::new();
+
+    // includes
+    builder
+        .include(get_hdfs_source_dir())
+        .include(format!("{}/os/posix", get_hdfs_source_dir()));
+
+    // files
+    builder
+        .file(get_hdfs_file_path("exception.c"))
+        .file(get_hdfs_file_path("jni_helper.c"))
+        .file(get_hdfs_file_path("jclasses.c"))
+        .file(get_hdfs_file_os_path("mutexes.c"))
+        .file(get_hdfs_file_os_path("thread_local_storage.c"))
+        .file(get_hdfs_file_path("hdfs.c"));
+
+    for flag in flags {
+        builder.flag(flag);
+    }
+
+    // disable the warning message
+    builder.warnings(false);
+
+    builder.compile("hdfs");
+}
+
+fn build_minidfs_lib(flags: &Vec<String>) {
+    println!(
+        "cargo:rerun-if-changed={}",
+        get_minidfs_file_path("native_mini_dfs.c")
+    );
+
+    let mut builder = cc::Build::new();
+
+    // includes
+    builder
+        .include(get_hdfs_source_dir())
+        .include(format!("{}/os/posix", get_hdfs_source_dir()));
+
+    // files
+    builder.file(get_minidfs_file_path("native_mini_dfs.c"));
+
+    for flag in flags {
+        builder.flag(flag.as_str());
+    }
+    builder.compile("minidfs");
+}
+
+fn get_build_flags() -> Vec<String> {
+    let mut result = vec![];
+
+    result.extend(get_java_dependency());
+
+    result
+}
+
+fn get_java_dependency() -> Vec<String> {
+    let mut result = vec![];
+
+    match env::var("JAVA_HOME") {
+        Ok(val) => {
+            result.push(format!("-I{}/include", val));
+            if cfg!(target_os = "linux") {
+                result.push(format!("-I{}/include/linux", val));
+            } else if cfg!(target_os = "macos") {
+                result.push(format!("-I{}/include/darwin", val));
             }
-            Err(e) => {
-                panic!("JAVA_HOME shell environment must be set: {}", e);
-            }
+            // Tell cargo to tell rustc to link the system jvm shared library.
+            println!("cargo:rustc-link-search=native={}/jre/lib/server", val);
+            println!("cargo:rustc-link-lib=jvm");
         }
-
-        // for hdfs
-        match env::var("HADOOP_HOME") {
-            Ok(val) => {
-                // Tell cargo to tell rustc to link the system hdfs shared library.
-                println!("cargo:rustc-link-search=native={}/lib/native", val);
-                println!("cargo:rustc-link-lib=hdfs");
-                vec_flags.push(format!("-I{}/include", val));
-            }
-            Err(e) => {
-                panic!("HADOOP_HOME shell environment must be set: {}", e);
-            }
+        Err(e) => {
+            panic!("JAVA_HOME shell environment must be set: {}", e);
         }
     }
 
-    // build lib
-    {
-        let c_file = "c_src/libminidfs/native_mini_dfs.c";
-        println!("cargo:rerun-if-changed={}", c_file);
+    result
+}
 
-        let mut builder = cc::Build::new();
-        builder.file(c_file);
-        for flag in &vec_flags {
-            builder.flag(flag.as_str());
-        }
-        builder.compile("minidfs");
-    }
+fn get_hdfs_file_path(filename: &'static str) -> String {
+    format!("{}/{}", get_hdfs_source_dir(), filename)
+}
 
-    // build ffi for libhdfs and libminidfs
-    {
-        let (header, output) = ("c_src/wrapper.h", "hdfs-native.rs");
-        // Tell cargo to invalidate the built crate whenever the wrapper changes
-        println!("cargo:rerun-if-changed={}", header);
-        println!("cargo:rerun-if-changed={}", "c_src/libhdfs/hdfs.h");
-        println!(
-            "cargo:rerun-if-changed={}",
-            "c_src/libminidfs/native_mini_dfs.h"
-        );
+fn get_hdfs_file_os_path(filename: &'static str) -> String {
+    format!("{}/os/posix/{}", get_hdfs_source_dir(), filename)
+}
 
-        let bindings = bindgen::Builder::default()
-            .header(header)
-            .allowlist_function("nmd.*")
-            .allowlist_function("hdfs.*")
-            .allowlist_function("hadoop.*")
-            .clang_args(vec_flags)
-            .rustified_enum("tObjectKind")
-            .generate()
-            .expect("Unable to generate bindings");
+fn get_hdfs_source_dir() -> &'static str {
+    "c_src/libhdfs"
+}
 
-        let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-        bindings
-            .write_to_file(out_path.join(output))
-            .expect("Couldn't write bindings!");
-    }
+fn get_minidfs_file_path(filename: &'static str) -> String {
+    format!("{}/{}", "c_src/libminidfs", filename)
 }
