@@ -18,6 +18,7 @@
 //! it's a modified version of hdfs-rs
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::string::String;
@@ -47,6 +48,12 @@ pub struct HdfsFs {
     url: String,
     raw: hdfsFS,
     _marker: PhantomData<()>,
+}
+
+impl Debug for HdfsFs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HdfsFs").field("url", &self.url).finish()
+    }
 }
 
 impl HdfsFs {
@@ -425,6 +432,15 @@ pub struct HdfsFile {
     path: String,
     file: hdfsFile,
     _marker: PhantomData<()>,
+}
+
+impl Debug for HdfsFile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HdfsFile")
+            .field("url", &self.fs.url)
+            .field("path", &self.path)
+            .finish()
+    }
 }
 
 impl HdfsFile {
