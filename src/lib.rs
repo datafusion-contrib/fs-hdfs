@@ -41,16 +41,16 @@
 //! git = "https://github.com/yahoNanJing/fs-hdfs"
 //! ```
 //!
-//! fs-hdfs uses libhdfs. Firstly, we need to add library path to find the libhdfs.
+//! Firstly, we need to add library path for the jvm related dependencies.
 //! An example for MacOS,
 //!
 //! ```bash ignore
-//! export DYLD_LIBRARY_PATH=$HADOOP_HOME/lib/native:$JAVA_HOME/jre/lib/server
+//! export DYLD_LIBRARY_PATH=$JAVA_HOME/jre/lib/server
 //! ```
 //!
-//! Here, ``$HADOOP_HOME`` and ``$JAVA_HOME`` need to be specified and exported.
+//! Here, ``$JAVA_HOME`` need to be specified and exported.
 //!
-//! Since our dependent libhdfs is JNI native implementation, it requires the proper ``CLASSPATH``.
+//! Since our compiled libhdfs is JNI native implementation, it requires the proper ``CLASSPATH``.
 //! An example,
 //!
 //! ```bash ignore
@@ -64,6 +64,8 @@
 //! ```bash ignore
 //! export CLASSPATH=$CLASSPATH:`hadoop classpath`:$HADOOP_HOME/share/hadoop/tools/lib/*
 //! ```
+//!
+//! Here, ``$HADOOP_HOME`` need to be specified and exported.
 //!
 //! Then you can run
 //!

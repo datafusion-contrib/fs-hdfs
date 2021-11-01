@@ -11,9 +11,8 @@ It's based on the version ``0.0.4`` of http://hyunsik.github.io/hdfs-rs to provi
 * [API documentation] (https://yahonanjing.github.io/fs-hdfs)
 
 ## Requirements
-* Hadoop compiled with native library (i.e., maven profile ``-Pnative``)
-    * Please refer to https://github.com/apache/hadoop/blob/trunk/BUILDING.txt if you need more description.
 * The C related files are from the branch ``3.3.1`` of hadoop repository. For rust usage, a few changes are also applied.
+* No need to compile the Hadoop native library by yourself. However, the Hadoop jar dependencies are still required.
 
 ## Usage
 Add this to your Cargo.toml:
@@ -23,15 +22,15 @@ Add this to your Cargo.toml:
 fs-hdfs = "0.1.2"
 ```
 
-fs-hdfs uses libhdfs. Firstly, we need to add library path to find the libhdfs. An example for MacOS,
+Firstly, we need to add library path for the jvm related dependencies. An example for MacOS,
 
 ```sh
-export DYLD_LIBRARY_PATH=$HADOOP_HOME/lib/native:$JAVA_HOME/jre/lib/server
+export DYLD_LIBRARY_PATH=$JAVA_HOME/jre/lib/server
 ```
 
-Here, ``$HADOOP_HOME`` and ``$JAVA_HOME`` need to be specified and exported.
+Here, ``$JAVA_HOME`` need to be specified and exported.
 
-Since our dependent libhdfs is JNI native implementation, it requires the proper ``CLASSPATH``. An example,
+Since our compiled libhdfs is JNI native implementation, it requires the proper ``CLASSPATH``. An example,
 
 ```sh
 export CLASSPATH=$CLASSPATH:`hadoop classpath`
@@ -43,6 +42,8 @@ The test also requires the ``CLASSPATH``. In case that the java class of ``org.j
 ```sh
 export CLASSPATH=$CLASSPATH:`hadoop classpath`:$HADOOP_HOME/share/hadoop/tools/lib/*
 ```
+
+Here, ``$HADOOP_HOME`` need to be specified and exported.
 
 Then you can run
 
