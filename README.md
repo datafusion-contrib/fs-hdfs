@@ -27,6 +27,10 @@ Firstly, we need to add library path for the jvm related dependencies. An exampl
 ```sh
 export DYLD_LIBRARY_PATH=$JAVA_HOME/jre/lib/server
 ```
+For Centos
+```sh
+export LD_LIBRARY_PATH=$JAVA_HOME/jre/lib/amd64/server
+```
 
 Here, ``$JAVA_HOME`` need to be specified and exported.
 

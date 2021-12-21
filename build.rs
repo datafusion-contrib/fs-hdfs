@@ -121,11 +121,12 @@ fn get_java_dependency() -> Vec<String> {
             result.push(format!("-I{}/include", val));
             if cfg!(target_os = "linux") {
                 result.push(format!("-I{}/include/linux", val));
+                println!("cargo:rustc-link-search=native={}/jre/lib/amd64/server", val);
             } else if cfg!(target_os = "macos") {
                 result.push(format!("-I{}/include/darwin", val));
+                println!("cargo:rustc-link-search=native={}/jre/lib/server", val);
             }
             // Tell cargo to tell rustc to link the system jvm shared library.
-            println!("cargo:rustc-link-search=native={}/jre/lib/server", val);
             println!("cargo:rustc-link-lib=jvm");
         }
         Err(e) => {
