@@ -72,19 +72,14 @@ extern  "C" {
      * Some utility decls used in libhdfs.
      */
     struct hdfsBuilder;
-    /// size of data for read/write io ops
-    typedef int32_t   tSize;
-    /// time type in seconds
-    typedef time_t    tTime;
-    /// offset within the file
-    typedef int64_t   tOffset;
-    /// port
-    typedef uint16_t  tPort;
+    typedef int32_t   tSize; /// size of data for read/write io ops 
+    typedef time_t    tTime; /// time type in seconds
+    typedef int64_t   tOffset;/// offset within the file
+    typedef uint16_t  tPort; /// port
     typedef enum tObjectKind {
         kObjectKindFile = 'F',
         kObjectKindDirectory = 'D',
     } tObjectKind;
-    struct hdfsStreamBuilder;
 
 
     /**
@@ -173,35 +168,6 @@ extern  "C" {
     LIBHDFS_EXTERNAL
     void hdfsFileFreeReadStatistics(struct hdfsReadStatistics *stats);
 
-    struct hdfsHedgedReadMetrics {
-      uint64_t hedgedReadOps;
-      uint64_t hedgedReadOpsWin;
-      uint64_t hedgedReadOpsInCurThread;
-    };
-
-    /**
-     * Get cluster wide hedged read metrics.
-     *
-     * @param fs       The configured filesystem handle
-     * @param metrics  (out parameter) on a successful return, the hedged read
-     *                 metrics. Unchanged otherwise. You must free the returned
-     *                 statistics with hdfsFreeHedgedReadMetrics.
-     * @return         0 if the metrics were successfully returned, -1 otherwise.
-     *                 On a failure, please check errno against
-     *                 ENOTSUP. webhdfs, LocalFilesystem, and so forth may
-     *                 not support hedged read metrics.
-     */
-    LIBHDFS_EXTERNAL
-    int hdfsGetHedgedReadMetrics(hdfsFS fs, struct hdfsHedgedReadMetrics **metrics);
-
-    /**
-     * Free HDFS Hedged read metrics.
-     *
-     * @param metrics  The HDFS Hedged read metrics to free
-     */
-    LIBHDFS_EXTERNAL
-    void hdfsFreeHedgedReadMetrics(struct hdfsHedgedReadMetrics *metrics);
-
     /** 
      * hdfsConnectAsUser - Connect to a hdfs file system as a specific user
      * Connect to the hdfs.
@@ -289,12 +255,16 @@ extern  "C" {
      *
      * @param bld  The HDFS builder
      * @param nn   The NameNode to use.
+     *
      *             If the string given is 'default', the default NameNode
      *             configuration will be used (from the XML configuration files)
+     *
      *             If NULL is given, a LocalFileSystem will be created.
+     *
      *             If the string starts with a protocol type such as file:// or
      *             hdfs://, this protocol type will be used.  If not, the
      *             hdfs:// protocol type will be used.
+     *
      *             You may specify a NameNode port in the usual way by 
      *             passing a string of the format hdfs://<hostname>:<port>.
      *             Alternately, you may set the port with
@@ -406,11 +376,9 @@ extern  "C" {
     LIBHDFS_EXTERNAL
     int hdfsDisconnect(hdfsFS fs);
         
+
     /** 
      * hdfsOpenFile - Open a hdfs file in given mode.
-     * @deprecated    Use the hdfsStreamBuilder functions instead.
-     * This function does not support setting block sizes bigger than 2 GB.
-     *
      * @param fs The configured filesystem handle.
      * @param path The full path to the file.
      * @param flags - an | of bits/fcntl.h file flags - supported flags are O_RDONLY, O_WRONLY (meaning create or overwrite i.e., implies O_TRUNCAT), 
@@ -420,94 +388,12 @@ extern  "C" {
      * @param replication Block replication - pass 0 if you want to use
      * the default configured values.
      * @param blocksize Size of block - pass 0 if you want to use the
-     * default configured values.  Note that if you want a block size bigger
-     * than 2 GB, you must use the hdfsStreamBuilder API rather than this
-     * deprecated function.
+     * default configured values.
      * @return Returns the handle to the open file or NULL on error.
      */
     LIBHDFS_EXTERNAL
     hdfsFile hdfsOpenFile(hdfsFS fs, const char* path, int flags,
                           int bufferSize, short replication, tSize blocksize);
-
-    /**
-     * hdfsStreamBuilderAlloc - Allocate an HDFS stream builder.
-     *
-     * @param fs The configured filesystem handle.
-     * @param path The full path to the file.  Will be deep-copied.
-     * @param flags The open flags, as in hdfsOpenFile.
-     * @return Returns the hdfsStreamBuilder, or NULL on error.
-     */
-    LIBHDFS_EXTERNAL
-    struct hdfsStreamBuilder *hdfsStreamBuilderAlloc(hdfsFS fs,
-                                      const char *path, int flags);
-
-    /**
-     * hdfsStreamBuilderFree - Free an HDFS file builder.
-     *
-     * It is normally not necessary to call this function since
-     * hdfsStreamBuilderBuild frees the builder.
-     *
-     * @param bld The hdfsStreamBuilder to free.
-     */
-    LIBHDFS_EXTERNAL
-    void hdfsStreamBuilderFree(struct hdfsStreamBuilder *bld);
-
-    /**
-     * hdfsStreamBuilderSetBufferSize - Set the stream buffer size.
-     *
-     * @param bld The hdfs stream builder.
-     * @param bufferSize The buffer size to set.
-     *
-     * @return 0 on success, or -1 on error.  Errno will be set on error.
-     */
-    LIBHDFS_EXTERNAL
-    int hdfsStreamBuilderSetBufferSize(struct hdfsStreamBuilder *bld,
-                                       int32_t bufferSize);
-
-    /**
-     * hdfsStreamBuilderSetReplication - Set the replication for the stream.
-     * This is only relevant for output streams, which will create new blocks.
-     *
-     * @param bld The hdfs stream builder.
-     * @param replication The replication to set.
-     *
-     * @return 0 on success, or -1 on error.  Errno will be set on error.
-     *              If you call this on an input stream builder, you will get
-     *              EINVAL, because this configuration is not relevant to input
-     *              streams.
-     */
-    LIBHDFS_EXTERNAL
-    int hdfsStreamBuilderSetReplication(struct hdfsStreamBuilder *bld,
-                                        int16_t replication);
-
-    /**
-     * hdfsStreamBuilderSetDefaultBlockSize - Set the default block size for
-     * the stream.  This is only relevant for output streams, which will create
-     * new blocks.
-     *
-     * @param bld The hdfs stream builder.
-     * @param defaultBlockSize The default block size to set.
-     *
-     * @return 0 on success, or -1 on error.  Errno will be set on error.
-     *              If you call this on an input stream builder, you will get
-     *              EINVAL, because this configuration is not relevant to input
-     *              streams.
-     */
-    LIBHDFS_EXTERNAL
-    int hdfsStreamBuilderSetDefaultBlockSize(struct hdfsStreamBuilder *bld,
-                                       int64_t defaultBlockSize);
-
-    /**
-     * hdfsStreamBuilderBuild - Build the stream by calling open or create.
-     *
-     * @param bld The hdfs stream builder.  This pointer will be freed, whether
-     *            or not the open succeeds.
-     *
-     * @return the stream pointer on success, or NULL on error.  Errno will be
-     * set on error.
-     */
-    LIBHDFS_EXTERNAL
-    hdfsFile hdfsStreamBuilderBuild(struct hdfsStreamBuilder *bld);
 
     /**
      * hdfsTruncateFile - Truncate a hdfs file to given lenght.
@@ -522,7 +408,6 @@ extern  "C" {
      *         complete before proceeding with further file updates.
      *         -1 on error.
      */
-    LIBHDFS_EXTERNAL
     int hdfsTruncateFile(hdfsFS fs, const char* path, tOffset newlength);
 
     /**
@@ -600,8 +485,7 @@ extern  "C" {
     tSize hdfsRead(hdfsFS fs, hdfsFile file, void* buffer, tSize length);
 
     /** 
-     * hdfsPread - Positional read of data from an open file. Reads up to the
-     * number of specified bytes in length.
+     * hdfsPread - Positional read of data from an open file.
      * @param fs The configured filesystem handle.
      * @param file The file handle.
      * @param position Position from which to read
@@ -611,24 +495,6 @@ extern  "C" {
      */
     LIBHDFS_EXTERNAL
     tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset position,
-                    void* buffer, tSize length);
-
-    /**
-     * hdfsPreadFully - Positional read of data from an open file. Reads the
-     * number of specified bytes in length, or until the end of the data is
-     * reached. Unlike hdfsRead and hdfsPread, this method does not return
-     * the number of bytes read because either (1) the entire length of the
-     * buffer is filled, or (2) the end of the file is reached. If the eof is
-     * reached, an exception is thrown and errno is set to EINTR.
-     * @param fs The configured filesystem handle.
-     * @param file The file handle.
-     * @param position Position from which to read
-     * @param buffer The buffer to copy read bytes into.
-     * @param length The length of the buffer.
-     * @return Returns 0 on success, -1 on error.
-     */
-    LIBHDFS_EXTERNAL
-    int hdfsPreadFully(hdfsFS fs, hdfsFile file, tOffset position,
                     void* buffer, tSize length);
 
 
@@ -805,8 +671,7 @@ extern  "C" {
      * @param path The path of the directory. 
      * @param numEntries Set to the number of files/directories in path.
      * @return Returns a dynamically-allocated array of hdfsFileInfo
-     * objects; NULL on error or empty directory.
-     * errno is set to non-zero on error or zero on success.
+     * objects; NULL on error.
      */
     LIBHDFS_EXTERNAL
     hdfsFileInfo *hdfsListDirectory(hdfsFS fs, const char* path,
@@ -1019,6 +884,7 @@ extern  "C" {
      *                   hadoopRzBufferGet.  If you have reached EOF, the data
      *                   within the hadoopRzBuffer will be NULL.  You must still
      *                   free hadoopRzBuffer instances containing NULL.
+     *
      *                   On failure, we will return NULL plus an errno code.
      *                   errno = EOPNOTSUPP indicates that we could not do a
      *                   zero-copy read, and there was no ByteBufferPool
@@ -1059,38 +925,6 @@ extern  "C" {
      */
     LIBHDFS_EXTERNAL
     void hadoopRzBufferFree(hdfsFile file, struct hadoopRzBuffer *buffer);
-
-    /**
-     * Get the last exception root cause that happened in the context of the
-     * current thread, i.e. the thread that called into libHDFS.
-     *
-     * The pointer returned by this function is guaranteed to be valid until
-     * the next call into libHDFS by the current thread.
-     * Users of this function should not free the pointer.
-     *
-     * A NULL will be returned if no exception information could be retrieved
-     * for the previous call.
-     *
-     * @return           The root cause as a C-string.
-     */
-    LIBHDFS_EXTERNAL
-    char* hdfsGetLastExceptionRootCause();
-
-    /**
-     * Get the last exception stack trace that happened in the context of the
-     * current thread, i.e. the thread that called into libHDFS.
-     *
-     * The pointer returned by this function is guaranteed to be valid until
-     * the next call into libHDFS by the current thread.
-     * Users of this function should not free the pointer.
-     *
-     * A NULL will be returned if no exception information could be retrieved
-     * for the previous call.
-     *
-     * @return           The stack trace as a C-string.
-     */
-    LIBHDFS_EXTERNAL
-    char* hdfsGetLastExceptionStackTrace();
 
 #ifdef __cplusplus
 }

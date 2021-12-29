@@ -29,14 +29,9 @@
  *
  * If you encounter an exception, return a local reference to it.  The caller is
  * responsible for freeing the local reference, by calling a function like
- * printExceptionAndFree. (You can also free exceptions directly by calling
+ * PrintExceptionAndFree.  (You can also free exceptions directly by calling
  * DeleteLocalRef.  However, that would not produce an error message, so it's
  * usually not what you want.)
- *
- * The root cause and stack trace exception strings retrieved from the last
- * exception that happened on a thread are stored in the corresponding
- * thread local state and are accessed by hdfsGetLastExceptionRootCause and
- * hdfsGetLastExceptionStackTrace respectively.
  */
 
 #include "platform.h"
@@ -70,24 +65,6 @@
 #define NOPRINT_EXC_PARENT_NOT_DIRECTORY        0x08
 #define NOPRINT_EXC_ILLEGAL_ARGUMENT            0x10
 
-#ifdef WIN32
-    #ifdef LIBHDFS_DLL_EXPORT
-        #define LIBHDFS_EXTERNAL __declspec(dllexport)
-    #elif LIBHDFS_DLL_IMPORT
-        #define LIBHDFS_EXTERNAL __declspec(dllimport)
-    #else
-        #define LIBHDFS_EXTERNAL
-    #endif
-#else
-    #ifdef LIBHDFS_DLL_EXPORT
-        #define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
-    #elif LIBHDFS_DLL_IMPORT
-        #define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
-    #else
-        #define LIBHDFS_EXTERNAL
-    #endif
-#endif
-
 /**
  * Get information about an exception.
  *
@@ -100,13 +77,11 @@
  * @param shouldPrint     (out param) Nonzero if we should print this exception,
  *                        based on the noPrintFlags and its name. 
  */
-LIBHDFS_EXTERNAL
 void getExceptionInfo(const char *excName, int noPrintFlags,
                       int *excErrno, int *shouldPrint);
 
 /**
- * Store the information about an exception in the thread-local state and print
- * it and free the jthrowable object.
+ * Print out information about an exception and free it.
  *
  * @param env             The JNI environment
  * @param exc             The exception to print and free
@@ -118,13 +93,11 @@ void getExceptionInfo(const char *excName, int noPrintFlags,
  * @return                The POSIX error number associated with the exception
  *                        object.
  */
-LIBHDFS_EXTERNAL
 int printExceptionAndFreeV(JNIEnv *env, jthrowable exc, int noPrintFlags,
         const char *fmt, va_list ap);
 
 /**
- * Store the information about an exception in the thread-local state and print
- * it and free the jthrowable object.
+ * Print out information about an exception and free it.
  *
  * @param env             The JNI environment
  * @param exc             The exception to print and free
@@ -136,13 +109,11 @@ int printExceptionAndFreeV(JNIEnv *env, jthrowable exc, int noPrintFlags,
  * @return                The POSIX error number associated with the exception
  *                        object.
  */
-LIBHDFS_EXTERNAL
 int printExceptionAndFree(JNIEnv *env, jthrowable exc, int noPrintFlags,
         const char *fmt, ...) TYPE_CHECKED_PRINTF_FORMAT(4, 5);
 
 /**
- * Store the information about the pending exception in the thread-local state
- * and print it and free the jthrowable object.
+ * Print out information about the pending exception and free it.
  *
  * @param env             The JNI environment
  * @param noPrintFlags    Flags which determine which exceptions we should NOT
@@ -153,7 +124,6 @@ int printExceptionAndFree(JNIEnv *env, jthrowable exc, int noPrintFlags,
  * @return                The POSIX error number associated with the exception
  *                        object.
  */
-LIBHDFS_EXTERNAL
 int printPendingExceptionAndFree(JNIEnv *env, int noPrintFlags,
         const char *fmt, ...) TYPE_CHECKED_PRINTF_FORMAT(3, 4);
 
@@ -167,7 +137,6 @@ int printPendingExceptionAndFree(JNIEnv *env, int noPrintFlags,
  *
  * @return                The exception, or NULL if there was no exception
  */
-LIBHDFS_EXTERNAL
 jthrowable getPendingExceptionAndClear(JNIEnv *env);
 
 /**
@@ -181,10 +150,8 @@ jthrowable getPendingExceptionAndClear(JNIEnv *env);
  *
  * @return                A local reference to a RuntimeError
  */
-LIBHDFS_EXTERNAL
 jthrowable newRuntimeError(JNIEnv *env, const char *fmt, ...)
         TYPE_CHECKED_PRINTF_FORMAT(2, 3);
 
 #undef TYPE_CHECKED_PRINTF_FORMAT
-#undef LIBHDFS_EXTERNAL
 #endif

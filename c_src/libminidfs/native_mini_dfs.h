@@ -26,14 +26,9 @@ extern  "C" {
 #endif
 
 struct hdfsBuilder;
-/**
-* <div rustbindgen replaces="MiniDfsCluster"></div>
-*/
-struct NativeMiniDfsCluster;
+struct NativeMiniDfsCluster; 
 
 /**
- * <div rustbindgen replaces="MiniDfsConf"></div>
- *
  * Represents a configuration to use for creating a Native MiniDFSCluster
  */
 struct NativeMiniDfsConf {
@@ -56,11 +51,6 @@ struct NativeMiniDfsConf {
      * Nonzero if we should configure short circuit.
      */
     jboolean configureShortCircuit;
-
-    /**
-     * The number of datanodes in MiniDfsCluster
-     */
-    jint numDataNodes;
 };
 
 /**
@@ -70,7 +60,7 @@ struct NativeMiniDfsConf {
  *
  * @return      a NativeMiniDfsBuilder, or a NULL pointer on error.
  */
-struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf);
+struct NativeMiniDfsCluster* nmdCreate(struct NativeMiniDfsConf *conf);
 
 /**
  * Wait until a MiniDFSCluster comes out of safe mode.
@@ -83,7 +73,7 @@ struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf);
 int nmdWaitClusterUp(struct NativeMiniDfsCluster *cl);
 
 /**
- * Shut down a NativeMiniDFS cluster without deleting hdfs directory
+ * Shut down a NativeMiniDFS cluster
  *
  * @param cl        The cluster
  *
@@ -91,16 +81,6 @@ int nmdWaitClusterUp(struct NativeMiniDfsCluster *cl);
  *                  thrown.
  */
 int nmdShutdown(struct NativeMiniDfsCluster *cl);
-
-/**
- * Shut down a NativeMiniDFS cluster with deleting hdfs directory
- *
- * @param cl        The cluster
- *
- * @return          0 on success; a non-zero error code if an exception is
- *                  thrown.
- */
-int nmdShutdownClean(struct NativeMiniDfsCluster *cl);
 
 /**
  * Destroy a Native MiniDFSCluster
@@ -116,13 +96,13 @@ void nmdFree(struct NativeMiniDfsCluster* cl);
  *
  * @return          the port, or a negative error code
  */
-int nmdGetNameNodePort(const struct NativeMiniDfsCluster *cl);
+int nmdGetNameNodePort(const struct NativeMiniDfsCluster *cl); 
 
 /**
  * Get the http address that's in use by the given (non-HA) nativeMiniDfs
  *
  * @param cl        The initialized NativeMiniDfsCluster
- * @param port      Used to capture the http port of the NameNode
+ * @param port      Used to capture the http port of the NameNode 
  *                  of the NativeMiniDfsCluster
  * @param hostName  Used to capture the http hostname of the NameNode
  *                  of the NativeMiniDfsCluster
@@ -141,16 +121,6 @@ int nmdGetNameNodeHttpAddress(const struct NativeMiniDfsCluster *cl,
  * @return          A const string of domain socket path, or NULL if not set.
  */
 const char *hdfsGetDomainSocketPath(const struct NativeMiniDfsCluster *cl);
-
-/**
- * Configure the HDFS builder appropriately to connect to this cluster.
- *
- * @param bld       The hdfs builder
- *
- * @return          the port, or a negative error code
- */
-int nmdConfigureHdfsBuilder(struct NativeMiniDfsCluster *cl,
-                            struct hdfsBuilder *bld);
 
 #ifdef __cplusplus
 }

@@ -18,7 +18,6 @@
 
 #include "exception.h"
 #include "hdfs.h"
-#include "jclasses.h"
 #include "jni_helper.h"
 #include "platform.h"
 
@@ -29,71 +28,72 @@
 #define EXCEPTION_INFO_LEN (sizeof(gExceptionInfo)/sizeof(gExceptionInfo[0]))
 
 struct ExceptionInfo {
-    const char *const name;
+    const char * const name;
     int noPrintFlag;
     int excErrno;
 };
 
 static const struct ExceptionInfo gExceptionInfo[] = {
-        {
-                "java.io.FileNotFoundException",
-                NOPRINT_EXC_FILE_NOT_FOUND,
-                ENOENT,
-        },
-        {
-                "org.apache.hadoop.security.AccessControlException",
-                NOPRINT_EXC_ACCESS_CONTROL,
-                EACCES,
-        },
-        {
-                "org.apache.hadoop.fs.UnresolvedLinkException",
-                NOPRINT_EXC_UNRESOLVED_LINK,
-                ENOLINK,
-        },
-        {
-                "org.apache.hadoop.fs.ParentNotDirectoryException",
-                NOPRINT_EXC_PARENT_NOT_DIRECTORY,
-                ENOTDIR,
-        },
-        {
-                "java.lang.IllegalArgumentException",
-                NOPRINT_EXC_ILLEGAL_ARGUMENT,
-                EINVAL,
-        },
-        {
-                "java.lang.OutOfMemoryError",
-                0,
-                ENOMEM,
-        },
-        {
-                "org.apache.hadoop.hdfs.server.namenode.SafeModeException",
-                0,
-                EROFS,
-        },
-        {
-                "org.apache.hadoop.fs.FileAlreadyExistsException",
-                0,
-                EEXIST,
-        },
-        {
-                "org.apache.hadoop.hdfs.protocol.QuotaExceededException",
-                0,
-                EDQUOT,
-        },
-        {
-                "java.lang.UnsupportedOperationException",
-                0,
-                ENOTSUP,
-        },
-        {
-                "org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException",
-                0,
-                ESTALE,
-        },
+    {
+        "java.io.FileNotFoundException",
+        NOPRINT_EXC_FILE_NOT_FOUND,
+        ENOENT,
+    },
+    {
+        "org.apache.hadoop.security.AccessControlException",
+        NOPRINT_EXC_ACCESS_CONTROL,
+        EACCES,
+    },
+    {
+        "org.apache.hadoop.fs.UnresolvedLinkException",
+        NOPRINT_EXC_UNRESOLVED_LINK,
+        ENOLINK,
+    },
+    {
+        "org.apache.hadoop.fs.ParentNotDirectoryException",
+        NOPRINT_EXC_PARENT_NOT_DIRECTORY,
+        ENOTDIR,
+    },
+    {
+        "java.lang.IllegalArgumentException",
+        NOPRINT_EXC_ILLEGAL_ARGUMENT,
+        EINVAL,
+    },
+    {
+        "java.lang.OutOfMemoryError",
+        0,
+        ENOMEM,
+    },
+    {
+        "org.apache.hadoop.hdfs.server.namenode.SafeModeException",
+        0,
+        EROFS,
+    },
+    {
+        "org.apache.hadoop.fs.FileAlreadyExistsException",
+        0,
+        EEXIST,
+    },
+    {
+        "org.apache.hadoop.hdfs.protocol.QuotaExceededException",
+        0,
+        EDQUOT,
+    },
+    {
+        "java.lang.UnsupportedOperationException",
+        0,
+        ENOTSUP,
+    },
+    {
+        "org.apache.hadoop.hdfs.server.namenode.LeaseExpiredException",
+        0,
+        ESTALE,
+    },
 };
 
 void getExceptionInfo(const char *excName, int noPrintFlags,
-                      int *excErrno, int *shouldPrint) {
+                      int *excErrno, int *shouldPrint)
+{
     int i;
 
     for (i = 0; i < EXCEPTION_INFO_LEN; i++) {
@@ -110,52 +110,20 @@ void getExceptionInfo(const char *excName, int noPrintFlags,
     }
 }
 
-/**
- * getExceptionUtilString: A helper function that calls 'methodName' in
- * ExceptionUtils. The function 'methodName' should have a return type of a
- * java String.
- *
- * @param env        The JNI environment.
- * @param exc        The exception to get information for.
- * @param methodName The method of ExceptionUtils to call that has a String
- *                    return type.
- *
- * @return           A C-type string containing the string returned by
- *                   ExceptionUtils.'methodName', or NULL on failure.
- */
-static char *getExceptionUtilString(JNIEnv *env, jthrowable exc, char *methodName) {
-    jthrowable jthr;
-    jvalue jVal;
-    jstring jStr = NULL;
-    char *excString = NULL;
-    jthr = invokeMethod(env, &jVal, STATIC, NULL, JC_EXCEPTION_UTILS,
-                        methodName, "(Ljava/lang/Throwable;)Ljava/lang/String;", exc);
-    if (jthr) {
-        destroyLocalReference(env, jthr);
-        return NULL;
-    }
-    jStr = jVal.l;
-    jthr = newCStr(env, jStr, &excString);
-    if (jthr) {
-        destroyLocalReference(env, jthr);
-        return NULL;
-    }
-    destroyLocalReference(env, jStr);
-    return excString;
-}
-
 int printExceptionAndFreeV(JNIEnv *env, jthrowable exc, int noPrintFlags,
-                           const char *fmt, va_list ap) {
+        const char *fmt, va_list ap)
+{
     int i, noPrint, excErrno;
     char *className = NULL;
+    jstring jStr = NULL;
+    jvalue jVal;
     jthrowable jthr;
     const char *stackTrace;
-    const char *rootCause;
 
     jthr = classNameOfObject(exc, env, &className);
     if (jthr) {
         fprintf(stderr, "PrintExceptionAndFree: error determining class name "
-                        "of exception.\n");
+            "of exception.\n");
         className = strdup("(unknown)");
         destroyLocalReference(env, jthr);
     }
@@ -171,37 +139,40 @@ int printExceptionAndFreeV(JNIEnv *env, jthrowable exc, int noPrintFlags,
         noPrint = 0;
         excErrno = EINTERNAL;
     }
-
-    // We don't want to use ExceptionDescribe here, because that requires a
-    // pending exception. Instead, use ExceptionUtils.
-    rootCause = getExceptionUtilString(env, exc, "getMessage");
-    stackTrace = getExceptionUtilString(env, exc, "getStackTrace");
-    // Save the exception details in the thread-local state.
-    setTLSExceptionStrings(rootCause, stackTrace);
-
     if (!noPrint) {
         vfprintf(stderr, fmt, ap);
         fprintf(stderr, " error:\n");
 
-        if (!rootCause) {
-            fprintf(stderr, "(unable to get root cause for %s)\n", className);
+        // We don't want to  use ExceptionDescribe here, because that requires a
+        // pending exception.  Instead, use ExceptionUtils.
+        jthr = invokeMethod(env, &jVal, STATIC, NULL, 
+            "org/apache/commons/lang/exception/ExceptionUtils",
+            "getStackTrace", "(Ljava/lang/Throwable;)Ljava/lang/String;", exc);
+        if (jthr) {
+            fprintf(stderr, "(unable to get stack trace for %s exception: "
+                    "ExceptionUtils::getStackTrace error.)\n", className);
+            destroyLocalReference(env, jthr);
         } else {
-            fprintf(stderr, "%s", rootCause);
-        }
-        if (!stackTrace) {
-            fprintf(stderr, "(unable to get stack trace for %s)\n", className);
-        } else {
-            fprintf(stderr, "%s", stackTrace);
+            jStr = jVal.l;
+            stackTrace = (*env)->GetStringUTFChars(env, jStr, NULL);
+            if (!stackTrace) {
+                fprintf(stderr, "(unable to get stack trace for %s exception: "
+                        "GetStringUTFChars error.)\n", className);
+            } else {
+                fprintf(stderr, "%s", stackTrace);
+                (*env)->ReleaseStringUTFChars(env, jStr, stackTrace);
+            }
         }
     }
-
+    destroyLocalReference(env, jStr);
     destroyLocalReference(env, exc);
     free(className);
     return excErrno;
 }
 
 int printExceptionAndFree(JNIEnv *env, jthrowable exc, int noPrintFlags,
-                          const char *fmt, ...) {
+        const char *fmt, ...)
+{
     va_list ap;
     int ret;
 
@@ -212,7 +183,8 @@ int printExceptionAndFree(JNIEnv *env, jthrowable exc, int noPrintFlags,
 }
 
 int printPendingExceptionAndFree(JNIEnv *env, int noPrintFlags,
-                                 const char *fmt, ...) {
+        const char *fmt, ...)
+{
     va_list ap;
     int ret;
     jthrowable exc;
@@ -233,7 +205,8 @@ int printPendingExceptionAndFree(JNIEnv *env, int noPrintFlags,
     return ret;
 }
 
-jthrowable getPendingExceptionAndClear(JNIEnv *env) {
+jthrowable getPendingExceptionAndClear(JNIEnv *env)
+{
     jthrowable jthr = (*env)->ExceptionOccurred(env);
     if (!jthr)
         return NULL;
@@ -241,7 +214,8 @@ jthrowable getPendingExceptionAndClear(JNIEnv *env) {
     return jthr;
 }
 
-jthrowable newRuntimeError(JNIEnv *env, const char *fmt, ...) {
+jthrowable newRuntimeError(JNIEnv *env, const char *fmt, ...)
+{
     char buf[512];
     jobject out, exc;
     jstring jstr;
@@ -257,7 +231,7 @@ jthrowable newRuntimeError(JNIEnv *env, const char *fmt, ...) {
         return getPendingExceptionAndClear(env);
     }
     exc = constructNewObjectOfClass(env, &out, "RuntimeException",
-                                    "(java/lang/String;)V", jstr);
+        "(java/lang/String;)V", jstr);
     (*env)->DeleteLocalRef(env, jstr);
     // Again, we'll either get an out of memory exception or the
     // RuntimeException we wanted.

@@ -19,8 +19,6 @@
 #ifndef LIBHDFS_JNI_HELPER_H
 #define LIBHDFS_JNI_HELPER_H
 
-#include "jclasses.h"
-
 #include <jni.h>
 #include <stdio.h>
 
@@ -28,33 +26,8 @@
 #include <stdarg.h>
 #include <errno.h>
 
-#ifdef WIN32
-    #define PATH_SEPARATOR ';'
-    #define PATH_SEPARATOR_STR ";"
-#else
-    #define PATH_SEPARATOR ':'
-    #define PATH_SEPARATOR_STR ":"
-#endif
+#define PATH_SEPARATOR ':'
 
-#ifdef WIN32
-    #ifdef LIBHDFS_DLL_EXPORT
-        #define LIBHDFS_EXTERNAL __declspec(dllexport)
-    #elif LIBHDFS_DLL_IMPORT
-        #define LIBHDFS_EXTERNAL __declspec(dllimport)
-    #else
-        #define LIBHDFS_EXTERNAL
-    #endif
-#else
-    #ifdef LIBHDFS_DLL_EXPORT
-        #define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
-    #elif LIBHDFS_DLL_IMPORT
-        #define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
-    #else
-        #define LIBHDFS_EXTERNAL
-    #endif
-#endif
-
-// #define _LIBHDFS_JNI_HELPER_DEBUGGING_ON_
 
 /** Denote the method we want to invoke as STATIC or INSTANCE */
 typedef enum {
@@ -71,7 +44,6 @@ typedef enum {
  *
  * @return          NULL on success; the exception otherwise
  */
-LIBHDFS_EXTERNAL
 jthrowable newCStr(JNIEnv *env, jstring jstr, char **out);
 
 /**
@@ -83,7 +55,6 @@ jthrowable newCStr(JNIEnv *env, jstring jstr, char **out);
  *
  * @return          NULL on success; the exception otherwise
  */
-LIBHDFS_EXTERNAL
 jthrowable newJavaStr(JNIEnv *env, const char *str, jstring *out);
 
 /**
@@ -92,16 +63,15 @@ jthrowable newJavaStr(JNIEnv *env, const char *str, jstring *out);
  * @param jFile: The local reference of java.lang.Object object
  * @return None.
  */
-LIBHDFS_EXTERNAL
 void destroyLocalReference(JNIEnv *env, jobject jObject);
 
 /** invokeMethod: Invoke a Static or Instance method.
+ * className: Name of the class where the method can be found
  * methName: Name of the method
  * methSignature: the signature of the method "(arg-types)ret-type"
  * methType: The type of the method (STATIC or INSTANCE)
  * instObj: Required if the methType is INSTANCE. The object to invoke
    the method on.
- * class: The CachedJavaClass to call the method on.
  * env: The JNIEnv pointer
  * retval: The pointer to a union type which will contain the result of the
    method invocation, e.g. if the method returns an Object, retval will be
@@ -112,39 +82,18 @@ void destroyLocalReference(JNIEnv *env, jobject jObject);
  * RETURNS: -1 on error and 0 on success. If -1 is returned, exc will have 
    a valid exception reference, and the result stored at retval is undefined.
  */
-LIBHDFS_EXTERNAL
 jthrowable invokeMethod(JNIEnv *env, jvalue *retval, MethType methType,
-        jobject instObj, CachedJavaClass class,
-        const char *methName, const char *methSignature, ...);
+                 jobject instObj, const char *className, const char *methName, 
+                 const char *methSignature, ...);
 
-/**
- * findClassAndInvokeMethod: Same as invokeMethod, but it calls FindClass on
- * the given className first and then calls invokeMethod. This method exists
- * mainly for test infrastructure, any production code should use
- * invokeMethod. Calling FindClass repeatedly can introduce performance
- * overhead, so users should prefer invokeMethod and supply a CachedJavaClass.
- */
-LIBHDFS_EXTERNAL
-jthrowable findClassAndInvokeMethod(JNIEnv *env, jvalue *retval,
-        MethType methType, jobject instObj, const char *className,
-        const char *methName, const char *methSignature, ...);
+jthrowable constructNewObjectOfClass(JNIEnv *env, jobject *out, const char *className, 
+                                  const char *ctorSignature, ...);
 
-LIBHDFS_EXTERNAL
-jthrowable constructNewObjectOfClass(JNIEnv *env, jobject *out,
-        const char *className, const char *ctorSignature, ...);
+jthrowable methodIdFromClass(const char *className, const char *methName, 
+                            const char *methSignature, MethType methType, 
+                            JNIEnv *env, jmethodID *out);
 
-/**
- * Same as constructNewObjectOfClass but it takes in a CachedJavaClass
- * rather than a className. This avoids an extra call to FindClass.
- */
-LIBHDFS_EXTERNAL
-jthrowable constructNewObjectOfCachedClass(JNIEnv *env, jobject *out,
-        CachedJavaClass cachedJavaClass, const char *ctorSignature, ...);
-
-LIBHDFS_EXTERNAL
-jthrowable methodIdFromClass(jclass cls, const char *className,
-        const char *methName, const char *methSignature, MethType methType,
-        JNIEnv *env, jmethodID *out);
+jthrowable globalClassReference(const char *className, JNIEnv *env, jclass *out);
 
 /** classNameOfObject: Get an object's class name.
  * @param jobj: The object.
@@ -153,55 +102,15 @@ jthrowable methodIdFromClass(jclass cls, const char *className,
  * class name. This string must be freed by the caller.
  * @return NULL on success, or the exception
  */
-LIBHDFS_EXTERNAL
 jthrowable classNameOfObject(jobject jobj, JNIEnv *env, char **name);
 
 /** getJNIEnv: A helper function to get the JNIEnv* for the given thread.
- * It gets this from the ThreadLocalState if it exists. If a ThreadLocalState
- * does not exist, one will be created.
  * If no JVM exists, then one will be created. JVM command line arguments
  * are obtained from the LIBHDFS_OPTS environment variable.
  * @param: None.
  * @return The JNIEnv* corresponding to the thread.
  * */
-LIBHDFS_EXTERNAL
 JNIEnv* getJNIEnv(void);
-
-/**
- * Get the last exception root cause that happened in the context of the
- * current thread.
- *
- * The pointer returned by this function is guaranteed to be valid until
- * the next call to invokeMethod() by the current thread.
- * Users of this function should not free the pointer.
- *
- * @return The root cause as a C-string.
- */
-LIBHDFS_EXTERNAL
-char* getLastTLSExceptionRootCause();
-
-/**
- * Get the last exception stack trace that happened in the context of the
- * current thread.
- *
- * The pointer returned by this function is guaranteed to be valid until
- * the next call to invokeMethod() by the current thread.
- * Users of this function should not free the pointer.
- *
- * @return The stack trace as a C-string.
- */
-LIBHDFS_EXTERNAL
-char* getLastTLSExceptionStackTrace();
-
-/** setTLSExceptionStrings: Sets the 'rootCause' and 'stackTrace' in the
- * ThreadLocalState if one exists for the current thread.
- *
- * @param rootCause A string containing the root cause of an exception.
- * @param stackTrace A string containing the stack trace of an exception.
- * @return None.
- */
-LIBHDFS_EXTERNAL
-void setTLSExceptionStrings(const char *rootCause, const char *stackTrace);
 
 /**
  * Figure out if a Java object is an instance of a particular class.
@@ -214,7 +123,6 @@ void setTLSExceptionStrings(const char *rootCause, const char *stackTrace);
  *             0 if the object is not of the given class.
  *             1 if the object is of the given class.
  */
-LIBHDFS_EXTERNAL
 int javaObjectIsOfClass(JNIEnv *env, jobject obj, const char *name);
 
 /**
@@ -227,7 +135,6 @@ int javaObjectIsOfClass(JNIEnv *env, jobject obj, const char *name);
  *
  * @return                  NULL on success; exception otherwise
  */
-LIBHDFS_EXTERNAL
 jthrowable hadoopConfSetStr(JNIEnv *env, jobject jConfiguration,
         const char *key, const char *value);
 
@@ -243,11 +150,9 @@ jthrowable hadoopConfSetStr(JNIEnv *env, jobject jConfiguration,
  *
  * @return                  NULL on success; exception otherwise
  */
-LIBHDFS_EXTERNAL
 jthrowable fetchEnumInstance(JNIEnv *env, const char *className,
                              const char *valueName, jobject *out);
 
-#undef LIBHDFS_EXTERNAL
 #endif /*LIBHDFS_JNI_HELPER_H*/
 
 /**
