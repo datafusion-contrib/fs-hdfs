@@ -174,7 +174,7 @@ int printExceptionAndFreeV(JNIEnv *env, jthrowable exc, int noPrintFlags,
 
     // We don't want to use ExceptionDescribe here, because that requires a
     // pending exception. Instead, use ExceptionUtils.
-    rootCause = getExceptionUtilString(env, exc, "getRootCauseMessage");
+    rootCause = getExceptionUtilString(env, exc, "getMessage");
     stackTrace = getExceptionUtilString(env, exc, "getStackTrace");
     // Save the exception details in the thread-local state.
     setTLSExceptionStrings(rootCause, stackTrace);

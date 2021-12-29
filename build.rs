@@ -38,6 +38,9 @@ fn build_ffi(flags: &Vec<String>) {
         get_minidfs_file_path("native_mini_dfs.h")
     );
 
+    // To avoid the order issue of dependent dynamic libraries
+    println!("cargo:rustc-link-lib=jvm");
+
     let bindings = bindgen::Builder::default()
         .header(header)
         .allowlist_function("nmd.*")
@@ -121,7 +124,10 @@ fn get_java_dependency() -> Vec<String> {
             result.push(format!("-I{}/include", val));
             if cfg!(target_os = "linux") {
                 result.push(format!("-I{}/include/linux", val));
-                println!("cargo:rustc-link-search=native={}/jre/lib/amd64/server", val);
+                println!(
+                    "cargo:rustc-link-search=native={}/jre/lib/amd64/server",
+                    val
+                );
             } else if cfg!(target_os = "macos") {
                 result.push(format!("-I{}/include/darwin", val));
                 println!("cargo:rustc-link-search=native={}/jre/lib/server", val);

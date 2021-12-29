@@ -373,10 +373,11 @@ int nmdConfigureHdfsBuilder(struct NativeMiniDfsCluster *cl,
 
     hdfsBuilderSetNameNode(bld, "localhost");
     port = (tPort) nmdGetNameNodePort(cl);
-    if (port < 0) {
-        fprintf(stderr, "nmdGetNameNodePort failed with error %d\n", -port);
-        return EIO;
-    }
+    // Don't need this because always false
+//    if (port < 0) {
+//        fprintf(stderr, "nmdGetNameNodePort failed with error %d\n", -port);
+//        return EIO;
+//    }
     hdfsBuilderSetNameNodePort(bld, port);
 
     domainSocket = hdfsGetDomainSocketPath(cl);
