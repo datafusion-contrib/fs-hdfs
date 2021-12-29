@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-#include "common/htable.h"
+#include "htable.h"
 
 #include <errno.h>
 #include <inttypes.h>

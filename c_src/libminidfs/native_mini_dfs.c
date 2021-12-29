@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+#include "../libhdfs/hdfs.h"
 #include "exception.h"
 #include "jni_helper.h"
 #include "native_mini_dfs.h"
@@ -104,7 +105,7 @@ static jthrowable nmdConfigureShortCircuit(JNIEnv *env,
     return NULL;
 }
 
-struct NativeMiniDfsCluster* nmdCreate(struct NativeMiniDfsConf *conf)
+struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf)
 {
     struct NativeMiniDfsCluster* cl = NULL;
     jobject bld = NULL, cobj = NULL, cluster = NULL;
@@ -241,7 +242,7 @@ void nmdFree(struct NativeMiniDfsCluster* cl)
     free(cl);
 }
 
-int nmdShutdown(struct NativeMiniDfsCluster* cl)
+int nmdShutdownInner(struct NativeMiniDfsCluster* cl, jboolean deleteDfsDir)
 {
     JNIEnv *env = getJNIEnv();
     jthrowable jthr;
@@ -251,13 +252,21 @@ int nmdShutdown(struct NativeMiniDfsCluster* cl)
         return -EIO;
     }
     jthr = invokeMethod(env, NULL, INSTANCE, cl->obj,
-            MINIDFS_CLUSTER, "shutdown", "()V");
+            MINIDFS_CLUSTER, "shutdown", "(Z)V", deleteDfsDir);
     if (jthr) {
         printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
             "nmdShutdown: MiniDFSCluster#shutdown");
         return -EIO;
     }
     return 0;
+}
+
+int nmdShutdown(struct NativeMiniDfsCluster *cl) {
+    return nmdShutdownInner(cl, 0);
+}
+
+int nmdShutdownClean(struct NativeMiniDfsCluster *cl) {
+    return nmdShutdownInner(cl, 1);
 }
 
 int nmdWaitClusterUp(struct NativeMiniDfsCluster *cl)
@@ -372,4 +381,35 @@ const char *hdfsGetDomainSocketPath(const struct NativeMiniDfsCluster *cl) {
     }
 
     return NULL;
+}
+
+int nmdConfigureHdfsBuilder(struct NativeMiniDfsCluster *cl,
+                            struct hdfsBuilder *bld) {
+    int ret;
+    tPort port;
+    const char *domainSocket;
+
+    hdfsBuilderSetNameNode(bld, "localhost");
+    port = (tPort) nmdGetNameNodePort(cl);
+    // Don't need this because always false
+//    if (port < 0) {
+//        fprintf(stderr, "nmdGetNameNodePort failed with error %d\n", -port);
+//        return EIO;
+//    }
+    hdfsBuilderSetNameNodePort(bld, port);
+
+    domainSocket = hdfsGetDomainSocketPath(cl);
+
+    if (domainSocket) {
+        ret = hdfsBuilderConfSetStr(bld, "dfs.client.read.shortcircuit", "true");
+        if (ret) {
+            return ret;
+        }
+        ret = hdfsBuilderConfSetStr(bld, "dfs.domain.socket.path",
+                                    domainSocket);
+        if (ret) {
+            return ret;
+        }
+    }
+    return 0;
 }

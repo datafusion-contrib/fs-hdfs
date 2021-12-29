@@ -126,6 +126,5 @@ fn new_mini_dfs_conf() -> MiniDfsConf {
         webhdfsEnabled: 0,
         namenodeHttpPort: 0,
         configureShortCircuit: 0,
-        numDataNodes: 0,
     }
 }

@@ -65,6 +65,24 @@
 #define NOPRINT_EXC_PARENT_NOT_DIRECTORY        0x08
 #define NOPRINT_EXC_ILLEGAL_ARGUMENT            0x10
 
+#ifdef WIN32
+#ifdef LIBHDFS_DLL_EXPORT
+        #define LIBHDFS_EXTERNAL __declspec(dllexport)
+    #elif LIBHDFS_DLL_IMPORT
+        #define LIBHDFS_EXTERNAL __declspec(dllimport)
+    #else
+        #define LIBHDFS_EXTERNAL
+    #endif
+#else
+#ifdef LIBHDFS_DLL_EXPORT
+#define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
+#elif LIBHDFS_DLL_IMPORT
+#define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
+#else
+#define LIBHDFS_EXTERNAL
+#endif
+#endif
+
 /**
  * Get information about an exception.
  *
@@ -77,6 +95,7 @@
  * @param shouldPrint     (out param) Nonzero if we should print this exception,
  *                        based on the noPrintFlags and its name. 
  */
+LIBHDFS_EXTERNAL
 void getExceptionInfo(const char *excName, int noPrintFlags,
                       int *excErrno, int *shouldPrint);
 
@@ -93,6 +112,7 @@ void getExceptionInfo(const char *excName, int noPrintFlags,
  * @return                The POSIX error number associated with the exception
  *                        object.
  */
+LIBHDFS_EXTERNAL
 int printExceptionAndFreeV(JNIEnv *env, jthrowable exc, int noPrintFlags,
         const char *fmt, va_list ap);
 
@@ -109,6 +129,7 @@ int printExceptionAndFreeV(JNIEnv *env, jthrowable exc, int noPrintFlags,
  * @return                The POSIX error number associated with the exception
  *                        object.
  */
+LIBHDFS_EXTERNAL
 int printExceptionAndFree(JNIEnv *env, jthrowable exc, int noPrintFlags,
         const char *fmt, ...) TYPE_CHECKED_PRINTF_FORMAT(4, 5);
 
@@ -124,6 +145,7 @@ int printExceptionAndFree(JNIEnv *env, jthrowable exc, int noPrintFlags,
  * @return                The POSIX error number associated with the exception
  *                        object.
  */
+LIBHDFS_EXTERNAL
 int printPendingExceptionAndFree(JNIEnv *env, int noPrintFlags,
         const char *fmt, ...) TYPE_CHECKED_PRINTF_FORMAT(3, 4);
 
@@ -137,6 +159,7 @@ int printPendingExceptionAndFree(JNIEnv *env, int noPrintFlags,
  *
  * @return                The exception, or NULL if there was no exception
  */
+LIBHDFS_EXTERNAL
 jthrowable getPendingExceptionAndClear(JNIEnv *env);
 
 /**
@@ -150,8 +173,10 @@ jthrowable getPendingExceptionAndClear(JNIEnv *env);
  *
  * @return                A local reference to a RuntimeError
  */
+LIBHDFS_EXTERNAL
 jthrowable newRuntimeError(JNIEnv *env, const char *fmt, ...)
         TYPE_CHECKED_PRINTF_FORMAT(2, 3);
 
 #undef TYPE_CHECKED_PRINTF_FORMAT
+#undef LIBHDFS_EXTERNAL
 #endif

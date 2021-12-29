@@ -28,6 +28,23 @@
 
 #define PATH_SEPARATOR ':'
 
+#ifdef WIN32
+#ifdef LIBHDFS_DLL_EXPORT
+        #define LIBHDFS_EXTERNAL __declspec(dllexport)
+    #elif LIBHDFS_DLL_IMPORT
+        #define LIBHDFS_EXTERNAL __declspec(dllimport)
+    #else
+        #define LIBHDFS_EXTERNAL
+    #endif
+#else
+#ifdef LIBHDFS_DLL_EXPORT
+#define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
+#elif LIBHDFS_DLL_IMPORT
+#define LIBHDFS_EXTERNAL __attribute__((visibility("default")))
+#else
+#define LIBHDFS_EXTERNAL
+#endif
+#endif
 
 /** Denote the method we want to invoke as STATIC or INSTANCE */
 typedef enum {
@@ -44,6 +61,7 @@ typedef enum {
  *
  * @return          NULL on success; the exception otherwise
  */
+LIBHDFS_EXTERNAL
 jthrowable newCStr(JNIEnv *env, jstring jstr, char **out);
 
 /**
@@ -55,6 +73,7 @@ jthrowable newCStr(JNIEnv *env, jstring jstr, char **out);
  *
  * @return          NULL on success; the exception otherwise
  */
+LIBHDFS_EXTERNAL
 jthrowable newJavaStr(JNIEnv *env, const char *str, jstring *out);
 
 /**
@@ -63,6 +82,7 @@ jthrowable newJavaStr(JNIEnv *env, const char *str, jstring *out);
  * @param jFile: The local reference of java.lang.Object object
  * @return None.
  */
+LIBHDFS_EXTERNAL
 void destroyLocalReference(JNIEnv *env, jobject jObject);
 
 /** invokeMethod: Invoke a Static or Instance method.
@@ -82,17 +102,21 @@ void destroyLocalReference(JNIEnv *env, jobject jObject);
  * RETURNS: -1 on error and 0 on success. If -1 is returned, exc will have 
    a valid exception reference, and the result stored at retval is undefined.
  */
+LIBHDFS_EXTERNAL
 jthrowable invokeMethod(JNIEnv *env, jvalue *retval, MethType methType,
                  jobject instObj, const char *className, const char *methName, 
                  const char *methSignature, ...);
 
+LIBHDFS_EXTERNAL
 jthrowable constructNewObjectOfClass(JNIEnv *env, jobject *out, const char *className, 
                                   const char *ctorSignature, ...);
 
+LIBHDFS_EXTERNAL
 jthrowable methodIdFromClass(const char *className, const char *methName, 
                             const char *methSignature, MethType methType, 
                             JNIEnv *env, jmethodID *out);
 
+LIBHDFS_EXTERNAL
 jthrowable globalClassReference(const char *className, JNIEnv *env, jclass *out);
 
 /** classNameOfObject: Get an object's class name.
@@ -102,6 +126,7 @@ jthrowable globalClassReference(const char *className, JNIEnv *env, jclass *out)
  * class name. This string must be freed by the caller.
  * @return NULL on success, or the exception
  */
+LIBHDFS_EXTERNAL
 jthrowable classNameOfObject(jobject jobj, JNIEnv *env, char **name);
 
 /** getJNIEnv: A helper function to get the JNIEnv* for the given thread.
@@ -110,6 +135,7 @@ jthrowable classNameOfObject(jobject jobj, JNIEnv *env, char **name);
  * @param: None.
  * @return The JNIEnv* corresponding to the thread.
  * */
+LIBHDFS_EXTERNAL
 JNIEnv* getJNIEnv(void);
 
 /**
@@ -123,6 +149,7 @@ JNIEnv* getJNIEnv(void);
  *             0 if the object is not of the given class.
  *             1 if the object is of the given class.
  */
+LIBHDFS_EXTERNAL
 int javaObjectIsOfClass(JNIEnv *env, jobject obj, const char *name);
 
 /**
@@ -135,6 +162,7 @@ int javaObjectIsOfClass(JNIEnv *env, jobject obj, const char *name);
  *
  * @return                  NULL on success; exception otherwise
  */
+LIBHDFS_EXTERNAL
 jthrowable hadoopConfSetStr(JNIEnv *env, jobject jConfiguration,
         const char *key, const char *value);
 
@@ -150,9 +178,11 @@ jthrowable hadoopConfSetStr(JNIEnv *env, jobject jConfiguration,
  *
  * @return                  NULL on success; exception otherwise
  */
+LIBHDFS_EXTERNAL
 jthrowable fetchEnumInstance(JNIEnv *env, const char *className,
                              const char *valueName, jobject *out);
 
+#undef LIBHDFS_EXTERNAL
 #endif /*LIBHDFS_JNI_HELPER_H*/
 
 /**

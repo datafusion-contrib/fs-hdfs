@@ -70,8 +70,8 @@ fn build_hdfs_lib(flags: &Vec<String>) {
     // files
     builder
         .file(get_hdfs_file_path("exception.c"))
+        .file(get_hdfs_file_path("htable.c"))
         .file(get_hdfs_file_path("jni_helper.c"))
-        .file(get_hdfs_file_path("jclasses.c"))
         .file(get_hdfs_file_os_path("mutexes.c"))
         .file(get_hdfs_file_os_path("thread_local_storage.c"))
         .file(get_hdfs_file_path("hdfs.c"));
