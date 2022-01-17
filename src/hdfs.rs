@@ -725,16 +725,17 @@ impl Drop for BlockHosts {
 
 pub const LOCAL_FS_SCHEME: &'static str = "file";
 pub const HDFS_FS_SCHEME: &'static str = "hdfs";
+pub const VIEW_FS_SCHEME: &'static str = "viewfs";
 
 #[inline]
 fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
     match Url::parse(path) {
         Ok(url) => match url.scheme() {
             LOCAL_FS_SCHEME => Ok("file:///".to_string()),
-            HDFS_FS_SCHEME => {
+            HDFS_FS_SCHEME | VIEW_FS_SCHEME => {
                 if let Some(host) = url.host() {
                     let mut uri_builder = String::new();
-                    uri_builder.push_str(&(format!("{}://{}", HDFS_FS_SCHEME, host)));
+                    uri_builder.push_str(&(format!("{}://{}", url.scheme(), host)));
 
                     if let Some(port) = url.port() {
                         uri_builder.push_str(&(format!(":{}", port)));
@@ -759,7 +760,7 @@ pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
     };
     match Url::parse(&path) {
         Ok(url) => match url.scheme() {
-            LOCAL_FS_SCHEME | HDFS_FS_SCHEME => Ok(url.to_string()),
+            LOCAL_FS_SCHEME | HDFS_FS_SCHEME | VIEW_FS_SCHEME => Ok(url.to_string()),
             _ => Err(HdfsErr::InvalidUrl(path.to_string())),
         },
         Err(_) => Err(HdfsErr::InvalidUrl(path.to_string())),

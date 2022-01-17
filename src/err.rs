@@ -16,6 +16,7 @@
 // under the License.
 
 /// Errors which can occur during accessing Hdfs cluster
+#[derive(Debug)]
 pub enum HdfsErr {
     Unknown,
     /// file path
