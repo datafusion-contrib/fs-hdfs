@@ -28,7 +28,7 @@ fn main() {
     build_ffi(vec_flags);
 }
 
-fn build_ffi(flags: &Vec<String>) {
+fn build_ffi(flags: &[String]) {
     let (header, output) = ("c_src/wrapper.h", "hdfs-native.rs");
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed={}", header);
@@ -57,7 +57,7 @@ fn build_ffi(flags: &Vec<String>) {
         .expect("Couldn't write bindings!");
 }
 
-fn build_hdfs_lib(flags: &Vec<String>) {
+fn build_hdfs_lib(flags: &[String]) {
     println!("cargo:rerun-if-changed={}", get_hdfs_file_path("hdfs.c"));
 
     let mut builder = cc::Build::new();
@@ -86,7 +86,7 @@ fn build_hdfs_lib(flags: &Vec<String>) {
     builder.compile("hdfs");
 }
 
-fn build_minidfs_lib(flags: &Vec<String>) {
+fn build_minidfs_lib(flags: &[String]) {
     println!(
         "cargo:rerun-if-changed={}",
         get_minidfs_file_path("native_mini_dfs.c")
@@ -112,6 +112,7 @@ fn get_build_flags() -> Vec<String> {
     let mut result = vec![];
 
     result.extend(get_java_dependency());
+    result.push(String::from("-Wno-incompatible-pointer-types"));
 
     result
 }

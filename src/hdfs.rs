@@ -616,7 +616,7 @@ impl FileStatus {
     /// Get the name of the file
     #[inline]
     pub fn name(&self) -> &str {
-        let slice = unsafe { CStr::from_ptr((&*self.ptr()).mName) }.to_bytes();
+        let slice = unsafe { CStr::from_ptr((*self.ptr()).mName) }.to_bytes();
         std::str::from_utf8(slice).unwrap()
     }
 
@@ -641,14 +641,14 @@ impl FileStatus {
     /// Get the owner of the file
     #[inline]
     pub fn owner(&self) -> &str {
-        let slice = unsafe { CStr::from_ptr((&*self.ptr()).mOwner) }.to_bytes();
+        let slice = unsafe { CStr::from_ptr((*self.ptr()).mOwner) }.to_bytes();
         std::str::from_utf8(slice).unwrap()
     }
 
     /// Get the group associated with the file
     #[inline]
     pub fn group(&self) -> &str {
-        let slice = unsafe { CStr::from_ptr((&*self.ptr()).mGroup) }.to_bytes();
+        let slice = unsafe { CStr::from_ptr((*self.ptr()).mGroup) }.to_bytes();
         std::str::from_utf8(slice).unwrap()
     }
 
@@ -659,6 +659,7 @@ impl FileStatus {
     }
 
     /// Get the length of this file, in bytes.
+    #[allow(clippy::len_without_is_empty)]
     #[inline]
     pub fn len(&self) -> usize {
         unsafe { &*self.ptr() }.mSize as usize
@@ -723,9 +724,9 @@ impl Drop for BlockHosts {
     }
 }
 
-pub const LOCAL_FS_SCHEME: &'static str = "file";
-pub const HDFS_FS_SCHEME: &'static str = "hdfs";
-pub const VIEW_FS_SCHEME: &'static str = "viewfs";
+pub const LOCAL_FS_SCHEME: &str = "file";
+pub const HDFS_FS_SCHEME: &str = "hdfs";
+pub const VIEW_FS_SCHEME: &str = "viewfs";
 
 #[inline]
 fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
@@ -753,7 +754,7 @@ fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
 
 #[inline]
 pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
-    let path = if path.starts_with("/") {
+    let path = if path.starts_with('/') {
         format!("{}://{}", LOCAL_FS_SCHEME, path)
     } else {
         path.to_string()
