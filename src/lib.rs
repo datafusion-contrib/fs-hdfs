@@ -54,7 +54,7 @@
 //! An example,
 //!
 //! ```bash ignore
-//! export CLASSPATH=$CLASSPATH:`hadoop classpath`
+//! export CLASSPATH=$CLASSPATH:`hadoop classpath --glob`
 //! ```
 //!
 //! ## Testing
@@ -62,7 +62,7 @@
 //! can't be found. Refine the ``$CLASSPATH`` as follows:
 //!
 //! ```bash ignore
-//! export CLASSPATH=$CLASSPATH:`hadoop classpath`:$HADOOP_HOME/share/hadoop/tools/lib/*
+//! export CLASSPATH=$CLASSPATH:`hadoop classpath --glob`:$HADOOP_HOME/share/hadoop/tools/lib/*
 //! ```
 //!
 //! Here, ``$HADOOP_HOME`` need to be specified and exported.

@@ -11,7 +11,7 @@ It's based on the version ``0.0.4`` of http://hyunsik.github.io/hdfs-rs to provi
 * [API documentation] (https://yahonanjing.github.io/fs-hdfs)
 
 ## Requirements
-* The C related files are from the branch ``3.3.1`` of hadoop repository. For rust usage, a few changes are also applied.
+* The C related files are from the branch ``2.7.3`` of hadoop repository. For rust usage, a few changes are also applied.
 * No need to compile the Hadoop native library by yourself. However, the Hadoop jar dependencies are still required.
 
 ## Usage
@@ -37,14 +37,14 @@ Here, ``$JAVA_HOME`` need to be specified and exported.
 Since our compiled libhdfs is JNI native implementation, it requires the proper ``CLASSPATH``. An example,
 
 ```sh
-export CLASSPATH=$CLASSPATH:`hadoop classpath`
+export CLASSPATH=$CLASSPATH:`hadoop classpath --glob`
 ```
 
 ## Testing
 The test also requires the ``CLASSPATH``. In case that the java class of ``org.junit.Assert`` can't be found. Refine the ``$CLASSPATH`` as follows:
 
 ```sh
-export CLASSPATH=$CLASSPATH:`hadoop classpath`:$HADOOP_HOME/share/hadoop/tools/lib/*
+export CLASSPATH=$CLASSPATH:`hadoop classpath --glob`:$HADOOP_HOME/share/hadoop/tools/lib/*
 ```
 
 Here, ``$HADOOP_HOME`` need to be specified and exported.
