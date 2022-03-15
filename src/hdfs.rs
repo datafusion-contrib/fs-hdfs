@@ -22,7 +22,7 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::string::String;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use lazy_static::lazy_static;
 use libc::{c_char, c_int, c_short, c_void, time_t};
@@ -37,7 +37,108 @@ const O_WRONLY: c_int = 1;
 const O_APPEND: c_int = 1024;
 
 lazy_static! {
-    static ref HDFS_CACHE: RwLock<HashMap<String, HdfsFs>> = RwLock::new(HashMap::new());
+    static ref HDFS_MANAGER: HdfsManager = HdfsManager::new();
+}
+
+/// Create instance of HdfsFs with a global cache.
+/// For each namenode uri, only one instance will be created
+pub fn get_hdfs_by_full_path(path: &str) -> Result<Arc<HdfsFs>, HdfsErr> {
+    HDFS_MANAGER.get_hdfs_by_full_path(path)
+}
+
+/// The default NameNode configuration will be used (from the XML configuration files)
+pub fn get_hdfs() -> Result<Arc<HdfsFs>, HdfsErr> {
+    HDFS_MANAGER.get_hdfs_by_full_path("default")
+}
+
+/// Remove an instance of HdfsFs from the cache by a specified path with uri
+pub fn unload_hdfs_cache_by_full_path(
+    path: &str,
+) -> Result<Option<Arc<HdfsFs>>, HdfsErr> {
+    HDFS_MANAGER.remove_hdfs_by_full_path(path)
+}
+
+/// Remove an instance of HdfsFs from the cache
+pub fn unload_hdfs_cache(hdfs: Arc<HdfsFs>) -> Result<Option<Arc<HdfsFs>>, HdfsErr> {
+    HDFS_MANAGER.remove_hdfs(hdfs)
+}
+
+/// Hdfs manager
+/// All of the HdfsFs instances will be managed in a singleton HdfsManager
+struct HdfsManager {
+    hdfs_cache: Arc<RwLock<HashMap<String, Arc<HdfsFs>>>>,
+}
+
+impl HdfsManager {
+    fn new() -> Self {
+        Self {
+            hdfs_cache: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    fn get_hdfs_by_full_path(&self, path: &str) -> Result<Arc<HdfsFs>, HdfsErr> {
+        let namenode_uri = match path {
+            "default" => "default".to_owned(),
+            _ => get_namenode_uri(path)?,
+        };
+
+        // Get if already exists
+        if let Some(hdfs_fs) = {
+            let cache = self.hdfs_cache.read().unwrap();
+            cache.get(&namenode_uri).cloned()
+        } {
+            return Ok(hdfs_fs);
+        }
+
+        let mut cache = self.hdfs_cache.write().unwrap();
+        // Check again if exists
+        let ret = if let Some(hdfs_fs) = cache.get(&namenode_uri) {
+            hdfs_fs.clone()
+        } else {
+            let hdfs_fs = unsafe {
+                let hdfs_builder = hdfsNewBuilder();
+                let cstr_uri = CString::new(namenode_uri.as_bytes()).unwrap();
+                hdfsBuilderSetNameNode(hdfs_builder, cstr_uri.as_ptr());
+                info!("Connecting to Namenode ({})", &namenode_uri);
+                hdfsBuilderConnect(hdfs_builder)
+            };
+
+            if hdfs_fs.is_null() {
+                return Err(HdfsErr::CannotConnectToNameNode(namenode_uri.clone()));
+            }
+
+            let hdfs_fs = Arc::new(HdfsFs {
+                url: namenode_uri.clone(),
+                raw: hdfs_fs,
+                _marker: PhantomData,
+            });
+            cache.insert(namenode_uri.clone(), hdfs_fs.clone());
+            hdfs_fs
+        };
+
+        Ok(ret)
+    }
+
+    fn remove_hdfs_by_full_path(
+        &self,
+        path: &str,
+    ) -> Result<Option<Arc<HdfsFs>>, HdfsErr> {
+        let namenode_uri = match path {
+            "default" => String::from("default"),
+            _ => get_namenode_uri(path)?,
+        };
+
+        self.remove_hdfs_inner(&namenode_uri)
+    }
+
+    fn remove_hdfs(&self, hdfs: Arc<HdfsFs>) -> Result<Option<Arc<HdfsFs>>, HdfsErr> {
+        self.remove_hdfs_inner(hdfs.url())
+    }
+
+    fn remove_hdfs_inner(&self, hdfs_key: &str) -> Result<Option<Arc<HdfsFs>>, HdfsErr> {
+        let mut cache = self.hdfs_cache.write().unwrap();
+        Ok(cache.remove(hdfs_key))
+    }
 }
 
 /// Hdfs Filesystem
@@ -57,66 +158,6 @@ impl Debug for HdfsFs {
 }
 
 impl HdfsFs {
-    /// Create instance of HdfsFs with a global cache.
-    /// For each namenode uri, only one instance will be created
-    pub fn new(path: &str) -> Result<HdfsFs, HdfsErr> {
-        let namenode_uri = match path {
-            "default" => String::from("default"),
-            _ => get_namenode_uri(path)?,
-        };
-
-        {
-            // Get if exists
-            let cache = HDFS_CACHE.read().unwrap();
-            let ret = cache.get(&namenode_uri);
-            if let Some(hdfs_fs) = ret {
-                return Ok(hdfs_fs.clone());
-            }
-        }
-
-        let mut cache = HDFS_CACHE.write().unwrap();
-        let ret = cache.get(&namenode_uri);
-        return if let Some(hdfs_fs) = ret {
-            // Check again if exists
-            Ok(hdfs_fs.clone())
-        } else {
-            let hdfs_fs = unsafe {
-                let hdfs_builder = hdfsNewBuilder();
-                let cstr_uri = CString::new(namenode_uri.as_bytes()).unwrap();
-                hdfsBuilderSetNameNode(hdfs_builder, cstr_uri.as_ptr());
-                info!("Connecting to Namenode ({})", &namenode_uri);
-                hdfsBuilderConnect(hdfs_builder)
-            };
-
-            if hdfs_fs.is_null() {
-                return Err(HdfsErr::CannotConnectToNameNode(namenode_uri.clone()));
-            }
-
-            let hdfs_fs = HdfsFs {
-                url: namenode_uri.clone(),
-                raw: hdfs_fs,
-                _marker: PhantomData,
-            };
-            cache.insert(namenode_uri.clone(), hdfs_fs.clone());
-            Ok(hdfs_fs)
-        };
-    }
-
-    /// The default NameNode configuration will be used (from the XML configuration files)
-    pub fn default() -> Result<HdfsFs, HdfsErr> {
-        HdfsFs::new("default")
-    }
-
-    pub fn remove(path: &str) -> Result<Option<HdfsFs>, HdfsErr> {
-        let namenode_uri = match path {
-            "default" => String::from("default"),
-            _ => get_namenode_uri(path)?,
-        };
-
-        let mut cache = HDFS_CACHE.write().unwrap();
-        Ok(cache.remove(&namenode_uri))
-    }
-
     /// Get HDFS namenode url
     #[inline]
     pub fn url(&self) -> &str {
@@ -777,7 +818,7 @@ mod test {
     #[cfg(feature = "use_existing_hdfs")]
     #[test]
     fn test_hdfs_default() {
-        let fs = super::HdfsFs::default().ok().unwrap();
+        let fs = super::get_hdfs().ok().unwrap();
 
         let uuid = Uuid::new_v4().to_string();
         let test_file = uuid.as_str();

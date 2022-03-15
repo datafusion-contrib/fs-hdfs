@@ -14,6 +14,7 @@
 //! Hdfs Utility
 
 use crate::err::HdfsErr;
+use crate::hdfs;
 use crate::hdfs::{get_uri, HdfsFs};
 use crate::minidfs::MiniDFS;
 use crate::native::{hdfsCopy, hdfsMove};
@@ -31,7 +32,7 @@ impl HdfsUtil {
         dst_path: &str,
     ) -> Result<bool, HdfsErr> {
         let src_uri = get_uri(src_path)?;
-        let src_fs = HdfsFs::new(&src_uri)?;
+        let src_fs = hdfs::get_hdfs_by_full_path(&src_uri)?;
 
         let dst_fs = dfs.get_hdfs()?;
 
@@ -47,7 +48,7 @@ impl HdfsUtil {
         let src_fs = dfs.get_hdfs()?;
 
         let dst_uri = get_uri(dst_path)?;
-        let dst_fs = HdfsFs::new(&dst_uri)?;
+        let dst_fs = hdfs::get_hdfs_by_full_path(&dst_uri)?;
 
         HdfsUtil::copy(&src_fs, src_path, &dst_fs, dst_path)
     }
@@ -59,7 +60,7 @@ impl HdfsUtil {
         dst_path: &str,
     ) -> Result<bool, HdfsErr> {
         let src_uri = get_uri(src_path)?;
-        let src_fs = HdfsFs::new(&src_uri)?;
+        let src_fs = hdfs::get_hdfs_by_full_path(&src_uri)?;
 
         let dst_fs = dfs.get_hdfs()?;
 
@@ -75,7 +76,7 @@ impl HdfsUtil {
         let src_fs = dfs.get_hdfs()?;
 
         let dst_uri = get_uri(dst_path)?;
-        let dst_fs = HdfsFs::new(&dst_uri)?;
+        let dst_fs = hdfs::get_hdfs_by_full_path(&dst_uri)?;
 
         HdfsUtil::mv(&src_fs, src_path, &dst_fs, dst_path)
     }
@@ -145,8 +146,6 @@ impl HdfsUtil {
 
 #[cfg(test)]
 mod test {
-    use crate::hdfs::HdfsFs;
-
     use super::*;
     use crate::minidfs::get_dfs;
     use std::path::Path;
@@ -165,7 +164,7 @@ mod test {
         {
             // Source
             let src_file_uri = format!("file://{}", src_path.to_str().unwrap());
-            let src_fs = HdfsFs::new(&src_file_uri).ok().unwrap();
+            let src_fs = hdfs::get_hdfs_by_full_path(&src_file_uri).ok().unwrap();
 
             // Destination
             let dst_file = format!("/{}", src_file_name);
@@ -217,7 +216,7 @@ mod test {
 
             // Destination
             let dst_file_uri = format!("file://{}", dst_file);
-            let dst_fs = HdfsFs::new(&dst_file_uri).ok().unwrap();
+            let dst_fs = hdfs::get_hdfs_by_full_path(&dst_file_uri).ok().unwrap();
 
             // Test copy
             {

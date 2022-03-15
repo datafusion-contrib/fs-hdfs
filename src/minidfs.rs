@@ -24,6 +24,7 @@ use std::str;
 use std::sync::Arc;
 
 use crate::err::HdfsErr;
+use crate::hdfs;
 use crate::hdfs::HdfsFs;
 use crate::native::*;
 
@@ -64,7 +65,7 @@ impl MiniDFS {
 
     fn stop(&self) {
         // remove hdfs from global cache
-        HdfsFs::remove(self.namenode_addr().as_str()).ok();
+        hdfs::unload_hdfs_cache_by_full_path(self.namenode_addr().as_str()).ok();
         unsafe {
             nmdShutdownClean(self.cluster);
             nmdFree(self.cluster);
@@ -112,8 +113,8 @@ impl MiniDFS {
         }
     }
 
-    pub fn get_hdfs(&self) -> Result<HdfsFs, HdfsErr> {
-        HdfsFs::new(self.namenode_addr().as_str())
+    pub fn get_hdfs(&self) -> Result<Arc<HdfsFs>, HdfsErr> {
+        hdfs::get_hdfs_by_full_path(self.namenode_addr().as_str())
     }
 }
 

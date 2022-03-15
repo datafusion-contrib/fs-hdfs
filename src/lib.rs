@@ -24,8 +24,12 @@
 //! ## Important Note
 //! The original ``libhdfs`` implementation allows only one ``HdfsFs`` instance for the
 //! same namenode because ``libhdfs`` only keeps a single ``hdfsFs`` entry for each namenode.
-//! As a result, a global cache ``HDFS_CACHE`` is introduced to control only one single ``hdfsFs`` entry created for each namenode.
+//! As a result, a global singleton ``HdfsManager`` is introduced to control only one single ``hdfsFs`` entry created for each namenode.
 //! Contrast, ``HdfsFs`` instance itself is thread-safe.
+//!
+//! This library mainly provides two public methods to load and unload ``HdfsFs``
+//! - pub fn get_hdfs_by_full_path(path: &str) -> Result<Arc<HdfsFs>, HdfsErr>
+//! - pub fn unload_hdfs_cache_by_full_path(path: &str) -> Result<Option<Arc<HdfsFs>>, HdfsErr>
 //!
 //! ## Usage
 //! in Cargo.toml:
@@ -76,12 +80,19 @@
 //! ## Example
 //!
 //! ```ignore
+//! use std::sync::Arc;
+//! use hdfs::hdfs::{get_hdfs_by_full_path, unload_hdfs_cache, HdfsFs};
 //!
-//! let fs: HdfsFs = HdfsFs::new("hdfs://localhost:8020/").ok().unwrap();
+//! let fs: Arc<HdfsFs> = get_hdfs_by_full_path("hdfs://localhost:8020/").ok().unwrap();
 //! match fs.mkdir("/data") {
 //!   Ok(_) => { println!("/data has been created") },
 //!   Err(_)  => { panic!("/data creation has failed") }
 //! };
+//!
+//! match unload_hdfs_cache(fs) {
+//!   Ok(Some(_)) => { println!("Unloading hdfs cache succeeded") },
+//!   _  => { panic!("Unloading hdfs cache failed") }
+//! }
 //! ```
 
 #![allow(non_upper_case_globals)]

@@ -58,9 +58,10 @@ cargo test
 ## Example
 
 ```rust
-use hdfs::hdfs::HdfsFs;
+use std::sync::Arc;
+use hdfs::hdfs::{get_hdfs_by_full_path, HdfsFs};
 
-let fs: HdfsFs = HdfsFs::new("hdfs://localhost:8020/").ok().unwrap();
+let fs: Arc<HdfsFs> = get_hdfs_by_full_path("hdfs://localhost:8020/").ok().unwrap();
 match fs.mkdir("/data") {
     Ok(_) => { println!("/data has been created") },
     Err(_)  => { panic!("/data creation has failed") }
