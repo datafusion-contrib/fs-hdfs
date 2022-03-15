@@ -619,6 +619,11 @@ impl HdfsFile {
     }
 }
 
+/// since HdfsFile is only the pointer to the file on Hdfs, here we implement Send+Sync trait
+unsafe impl Send for HdfsFile {}
+
+unsafe impl Sync for HdfsFile {}
+
 /// Interface that represents the client side information for a file or directory.
 pub struct FileStatus {
     raw: Rc<HdfsFileInfoPtr>,
