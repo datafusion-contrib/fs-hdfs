@@ -36,7 +36,7 @@
 //!
 //! ```ignore
 //! [dependencies]
-//! fs-hdfs = "0.1.4"
+//! fs-hdfs = "0.1.5"
 //! ```
 //! or
 //!

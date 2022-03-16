@@ -19,7 +19,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-fs-hdfs = "0.1.4"
+fs-hdfs = "0.1.5"
 ```
 
 Firstly, we need to add library path for the jvm related dependencies. An example for MacOS,
