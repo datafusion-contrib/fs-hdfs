@@ -234,13 +234,14 @@ impl HdfsFs {
             hdfsListDirectory(self.raw, cstr_path.as_ptr(), &mut entry_num)
         };
 
+        let mut list = Vec::new();
+
         if ptr.is_null() {
-            return Err(HdfsErr::Unknown);
+            return Ok(list);
         }
 
         let shared_ptr = Rc::new(HdfsFileInfoPtr::new_array(ptr, entry_num));
 
-        let mut list = Vec::new();
         for idx in 0..entry_num {
             list.push(FileStatus::from_array(shared_ptr.clone(), idx as u32));
         }
@@ -904,6 +905,46 @@ mod test {
                 {
                     assert_eq!(expected, name);
                 }
+
+                // Clean up
+                assert!(fs.delete(&test_dir, true).is_ok());
+            }
+        }
+    }
+
+    #[test]
+    fn test_list_status_with_empty_dir() {
+        let dfs = get_dfs();
+        {
+            let fs = dfs.get_hdfs().ok().unwrap();
+
+            // Test list status with empty directory
+            {
+                let uuid = Uuid::new_v4().to_string();
+                let test_dir = format!("/{}", uuid);
+                let empty_dir = format!("/{}", "_empty");
+
+                match fs.mkdir(&test_dir) {
+                    Ok(_) => println!("{} created", test_dir),
+                    Err(_) => panic!("Couldn't create {} directory", test_dir),
+                };
+
+                match fs.mkdir(&empty_dir) {
+                    Ok(_) => println!("{} created", test_dir),
+                    Err(_) => panic!("Couldn't create {} directory", test_dir),
+                };
+
+                let test_file = format!("{}/{}", &test_dir, "test.txt");
+                match fs.create(&test_file) {
+                    Ok(_) => println!("{} created", test_file),
+                    Err(_) => panic!("Couldn't create {} ", test_file),
+                }
+
+                let file_info = fs.list_status(&test_dir).ok().unwrap();
+                assert_eq!(file_info.len(), 1);
+
+                let file_info = fs.list_status(&empty_dir).ok().unwrap();
+                assert_eq!(file_info.len(), 0);
 
                 // Clean up
                 assert!(fs.delete(&test_dir, true).is_ok());
