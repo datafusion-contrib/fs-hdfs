@@ -234,13 +234,14 @@ impl HdfsFs {
             hdfsListDirectory(self.raw, cstr_path.as_ptr(), &mut entry_num)
         };
 
+        let mut list = Vec::new();
+
         if ptr.is_null() {
-            return Err(HdfsErr::Unknown);
+            return Ok(list);
         }
 
         let shared_ptr = Rc::new(HdfsFileInfoPtr::new_array(ptr, entry_num));
 
-        let mut list = Vec::new();
         for idx in 0..entry_num {
             list.push(FileStatus::from_array(shared_ptr.clone(), idx as u32));
         }
@@ -912,7 +913,7 @@ mod test {
     }
 
     #[test]
-    fn test_empty_dir() {
+    fn test_list_status_with_empty_dir() {
         let dfs = get_dfs();
         {
             let fs = dfs.get_hdfs().ok().unwrap();
@@ -933,8 +934,11 @@ mod test {
                     Err(_) => panic!("Couldn't create {} directory", test_dir),
                 };
 
-                let test_file = format!("/{}/{}", &test_dir, "test.txt");
-                fs.create(&test_file).unwrap();
+                let test_file = format!("{}/{}", &test_dir, "test.txt");
+                match fs.create(&test_file) {
+                    Ok(_) => println!("{} created", test_file),
+                    Err(_) => panic!("Couldn't create {} ", test_file),
+                }
 
                 let file_info = fs.list_status(&test_dir).ok().unwrap();
                 assert_eq!(file_info.len(), 1);
