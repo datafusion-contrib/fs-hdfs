@@ -16,17 +16,17 @@
 // under the License.
 
 //! it's a modified version of hdfs-rs
+use lazy_static::lazy_static;
+use libc::{c_char, c_int, c_short, c_void, time_t};
+use log::info;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::fmt::Write;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::string::String;
 use std::sync::{Arc, RwLock};
-
-use lazy_static::lazy_static;
-use libc::{c_char, c_int, c_short, c_void, time_t};
-use log::info;
 use url::Url;
 
 pub use crate::err::HdfsErr;
@@ -744,7 +744,7 @@ struct HdfsFileInfoPtr {
 }
 
 /// for safe deallocation
-impl<'a> Drop for HdfsFileInfoPtr {
+impl Drop for HdfsFileInfoPtr {
     fn drop(&mut self) {
         unsafe { hdfsFreeFileInfo(self.ptr as *mut hdfsFileInfo, self.len) };
     }
@@ -783,10 +783,10 @@ fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
             HDFS_FS_SCHEME | VIEW_FS_SCHEME => {
                 if let Some(host) = url.host() {
                     let mut uri_builder = String::new();
-                    uri_builder.push_str(&(format!("{}://{}", url.scheme(), host)));
+                    write!(&mut uri_builder, "{}://{}", url.scheme(), host).unwrap();
 
                     if let Some(port) = url.port() {
-                        uri_builder.push_str(&(format!(":{}", port)));
+                        write!(&mut uri_builder, ":{}", port).unwrap();
                     }
                     Ok(uri_builder)
                 } else {

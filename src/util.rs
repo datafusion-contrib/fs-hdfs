@@ -185,9 +185,7 @@ mod test {
 
             // Test move
             {
-                assert!(
-                    HdfsUtil::mv_file_to_hdfs(dfs.clone(), src_file, &dst_file).is_ok()
-                );
+                assert!(HdfsUtil::mv_file_to_hdfs(dfs, src_file, &dst_file).is_ok());
                 assert!(dst_fs.exist(&dst_file));
                 assert!(!src_fs.exist(src_file));
                 assert!(!Path::new(src_file).exists());
@@ -233,9 +231,7 @@ mod test {
             assert!(dst_fs.delete(dst_file, false).is_ok());
 
             {
-                assert!(
-                    HdfsUtil::mv_file_from_hdfs(dfs.clone(), &src_file, dst_file).is_ok()
-                );
+                assert!(HdfsUtil::mv_file_from_hdfs(dfs, &src_file, dst_file).is_ok());
                 assert!(!src_fs.exist(&src_file));
                 assert!(dst_fs.exist(dst_file));
                 assert!(Path::new(dst_file).exists());
