@@ -8,7 +8,7 @@ It's based on the version ``0.0.4`` of http://hyunsik.github.io/hdfs-rs to provi
 * Compared to hdfs-rs, it removes the lifetime in HdfsFs, which will be more friendly for others to depend on.
 
 ## Documentation
-* [API documentation] (https://yahonanjing.github.io/fs-hdfs)
+* [API documentation] (https://docs.rs/crate/fs-hdfs)
 
 ## Requirements
 * The C related files are from the branch ``2.7.3`` of hadoop repository. For rust usage, a few changes are also applied.
@@ -19,7 +19,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-fs-hdfs = "0.1.5"
+fs-hdfs = "0.1.6"
 ```
 
 Firstly, we need to add library path for the jvm related dependencies. An example for MacOS,
