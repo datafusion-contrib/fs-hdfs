@@ -42,7 +42,7 @@
 //!
 //! ```ignore
 //! [dependencies.fs-hdfs]
-//! git = "https://github.com/yahoNanJing/fs-hdfs"
+//! git = "https://github.com/datafusion-contrib/fs-hdfs"
 //! ```
 //!
 //! Firstly, we need to add library path for the jvm related dependencies.
