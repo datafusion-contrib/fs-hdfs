@@ -110,3 +110,5 @@ pub mod hdfs;
 pub mod minidfs;
 #[cfg(feature = "test_util")]
 pub mod util;
+/// For list files in a directory recursively
+pub mod walkdir;
