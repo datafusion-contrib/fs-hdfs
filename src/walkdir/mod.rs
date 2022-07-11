@@ -32,13 +32,12 @@ pub struct HdfsWalkDir {
 }
 
 impl HdfsWalkDir {
-    #[allow(dead_code)]
-    fn new(root: String) -> Result<Self, HdfsErr> {
+    pub fn new(root: String) -> Result<Self, HdfsErr> {
         let hdfs = hdfs::get_hdfs_by_full_path(&root)?;
         Ok(Self::new_with_hdfs(root, hdfs))
     }
 
-    fn new_with_hdfs(root: String, hdfs: Arc<HdfsFs>) -> Self {
+    pub fn new_with_hdfs(root: String, hdfs: Arc<HdfsFs>) -> Self {
         Self {
             hdfs,
             root,
