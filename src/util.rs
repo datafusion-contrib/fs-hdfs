@@ -108,7 +108,10 @@ impl HdfsUtil {
         if res == 0 {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to copy file from {} to {}",
+                src, dst
+            )))
         }
     }
 
@@ -139,7 +142,10 @@ impl HdfsUtil {
         if res == 0 {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to move file from {} to {}",
+                src, dst
+            )))
         }
     }
 }

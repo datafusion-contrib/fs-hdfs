@@ -15,10 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+
 /// Errors which can occur during accessing Hdfs cluster
 #[derive(Debug)]
 pub enum HdfsErr {
-    Unknown,
+    Generic(String),
     /// file path
     FileNotFound(String),
     /// file path           
@@ -28,3 +31,21 @@ pub enum HdfsErr {
     /// URL
     InvalidUrl(String),
 }
+
+impl Display for HdfsErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HdfsErr::FileNotFound(path) => write!(f, "Hdfs file {} not found", path),
+            HdfsErr::FileAlreadyExists(path) => {
+                write!(f, "Hdfs file {} already exists", path)
+            }
+            HdfsErr::InvalidUrl(path) => write!(f, "Hdfs url {} is not valid", path),
+            HdfsErr::CannotConnectToNameNode(namenode_uri) => {
+                write!(f, "Cannot connect to name node {}", namenode_uri)
+            }
+            HdfsErr::Generic(err_str) => write!(f, "Generic error with msg: {}", err_str),
+        }
+    }
+}
+
+impl Error for HdfsErr {}

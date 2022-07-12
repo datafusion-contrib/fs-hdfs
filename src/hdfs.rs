@@ -173,7 +173,10 @@ impl HdfsFs {
     /// Create HdfsFile from hdfsFile
     fn new_hdfs_file(&self, path: &str, file: hdfsFile) -> Result<HdfsFile, HdfsErr> {
         if file.is_null() {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to create/open file {}",
+                path
+            )))
         } else {
             Ok(HdfsFile {
                 fs: self.clone(),
@@ -219,7 +222,10 @@ impl HdfsFs {
         };
 
         if ptr.is_null() {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to get file status for {}",
+                path
+            )))
         } else {
             Ok(FileStatus::new(ptr))
         }
@@ -256,7 +262,9 @@ impl HdfsFs {
         if block_sz > 0 {
             Ok(block_sz as usize)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(
+                "Fail to get default block size".to_owned(),
+            ))
         }
     }
 
@@ -270,7 +278,10 @@ impl HdfsFs {
         if block_sz > 0 {
             Ok(block_sz as usize)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to get block size for file {}",
+                path
+            )))
         }
     }
 
@@ -281,7 +292,7 @@ impl HdfsFs {
         if block_sz > 0 {
             Ok(block_sz as usize)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic("Fail to get capacity".to_owned()))
         }
     }
 
@@ -292,7 +303,7 @@ impl HdfsFs {
         if block_sz > 0 {
             Ok(block_sz as usize)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic("Fail to get used size".to_owned()))
         }
     }
 
@@ -327,7 +338,10 @@ impl HdfsFs {
         if !ptr.is_null() {
             Ok(BlockHosts { ptr })
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to get block hosts for file {} from {} with length {}",
+                path, start, length
+            )))
         }
     }
 
@@ -417,7 +431,10 @@ impl HdfsFs {
         {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to create directory for {}",
+                path
+            )))
         }
     }
 
@@ -431,7 +448,10 @@ impl HdfsFs {
         {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to rename {} to {}",
+                old_path, new_path
+            )))
         }
     }
 
@@ -444,7 +464,10 @@ impl HdfsFs {
         {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to set replication {} for {}",
+                num, path
+            )))
         }
     }
 
@@ -457,7 +480,10 @@ impl HdfsFs {
         {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to delete {} with recursive mode {}",
+                path, recursive
+            )))
         }
     }
 }
@@ -502,7 +528,10 @@ impl HdfsFile {
         if unsafe { hdfsAvailable(self.fs.raw, self.file) } == 0 {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "File {} is not available",
+                self.path()
+            )))
         }
     }
 
@@ -511,7 +540,10 @@ impl HdfsFile {
         if unsafe { hdfsCloseFile(self.fs.raw, self.file) } == 0 {
             Ok(true)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to close file {}",
+                self.path()
+            )))
         }
     }
 
@@ -555,7 +587,10 @@ impl HdfsFile {
         if pos > 0 {
             Ok(pos as u64)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to get current offset of file {}",
+                self.path()
+            )))
         }
     }
 
@@ -573,7 +608,11 @@ impl HdfsFile {
         if read_len > 0 {
             Ok(read_len as i32)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to read contents from {} with return code {}",
+                self.path(),
+                read_len
+            )))
         }
     }
 
@@ -592,7 +631,12 @@ impl HdfsFile {
         if read_len > 0 {
             Ok(read_len as i32)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to read contents from {} with offset {} and return code {}",
+                self.path(),
+                pos,
+                read_len
+            )))
         }
     }
 
@@ -615,7 +659,10 @@ impl HdfsFile {
         if written_len > 0 {
             Ok(written_len)
         } else {
-            Err(HdfsErr::Unknown)
+            Err(HdfsErr::Generic(format!(
+                "Fail to write contents to file {}",
+                self.path()
+            )))
         }
     }
 }
