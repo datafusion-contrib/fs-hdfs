@@ -139,7 +139,7 @@ impl fmt::Debug for IterOptions {
     }
 }
 
-pub trait TreeManager<V, N, E> {
+pub trait TreeManager<V, N, E>: Send + Sync {
     fn to_value(&self, v: V) -> Result<N, E>;
 
     fn get_children(&self, n: &N) -> Result<Vec<N>, E>;

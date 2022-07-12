@@ -16,17 +16,17 @@
 // under the License.
 
 //! it's a modified version of hdfs-rs
-use lazy_static::lazy_static;
-use libc::{c_char, c_int, c_short, c_void, time_t};
-use log::info;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fmt::Write;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::rc::Rc;
 use std::string::String;
 use std::sync::{Arc, RwLock};
+
+use lazy_static::lazy_static;
+use libc::{c_char, c_int, c_short, c_void, time_t};
+use log::info;
 use url::Url;
 
 pub use crate::err::HdfsErr;
@@ -240,7 +240,7 @@ impl HdfsFs {
             return Ok(list);
         }
 
-        let shared_ptr = Rc::new(HdfsFileInfoPtr::new_array(ptr, entry_num));
+        let shared_ptr = Arc::new(HdfsFileInfoPtr::new_array(ptr, entry_num));
 
         for idx in 0..entry_num {
             list.push(FileStatus::from_array(shared_ptr.clone(), idx as u32));
@@ -626,8 +626,9 @@ unsafe impl Send for HdfsFile {}
 unsafe impl Sync for HdfsFile {}
 
 /// Interface that represents the client side information for a file or directory.
+#[derive(Clone)]
 pub struct FileStatus {
-    raw: Rc<HdfsFileInfoPtr>,
+    raw: Arc<HdfsFileInfoPtr>,
     idx: u32,
     _marker: PhantomData<()>,
 }
@@ -637,7 +638,7 @@ impl FileStatus {
     #[inline]
     fn new(ptr: *const hdfsFileInfo) -> FileStatus {
         FileStatus {
-            raw: Rc::new(HdfsFileInfoPtr::new(ptr)),
+            raw: Arc::new(HdfsFileInfoPtr::new(ptr)),
             idx: 0,
             _marker: PhantomData,
         }
@@ -646,7 +647,7 @@ impl FileStatus {
     /// create FileStatus from *const hdfsFileInfo which points
     /// to dynamically allocated array.
     #[inline]
-    fn from_array(raw: Rc<HdfsFileInfoPtr>, idx: u32) -> FileStatus {
+    fn from_array(raw: Arc<HdfsFileInfoPtr>, idx: u32) -> FileStatus {
         FileStatus {
             raw,
             idx,
@@ -759,6 +760,11 @@ impl HdfsFileInfoPtr {
         HdfsFileInfoPtr { ptr, len }
     }
 }
+
+/// since HdfsFileInfoPtr is only the pointer to the Hdfs file info, here we implement Send+Sync trait
+unsafe impl Send for HdfsFileInfoPtr {}
+
+unsafe impl Sync for HdfsFileInfoPtr {}
 
 /// Includes hostnames where a particular block of a file is stored.
 pub struct BlockHosts {
