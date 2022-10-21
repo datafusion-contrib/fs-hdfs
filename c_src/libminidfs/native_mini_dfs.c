@@ -224,7 +224,7 @@ void nmdFree(struct NativeMiniDfsCluster* cl)
     free(cl);
 }
 
-int nmdShutdown(struct NativeMiniDfsCluster* cl)
+int nmdShutdownInner(struct NativeMiniDfsCluster* cl, jboolean deleteDfsDir)
 {
     JNIEnv *env = getJNIEnv();
     jthrowable jthr;
@@ -234,13 +234,21 @@ int nmdShutdown(struct NativeMiniDfsCluster* cl)
         return -EIO;
     }
     jthr = invokeMethod(env, NULL, INSTANCE, cl->obj,
-            MINIDFS_CLUSTER, "shutdown", "()V");
+                        MINIDFS_CLUSTER, "shutdown", "(Z)V", deleteDfsDir);
     if (jthr) {
         printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
-            "nmdShutdown: MiniDFSCluster#shutdown");
+                              "nmdShutdown: MiniDFSCluster#shutdown");
         return -EIO;
     }
     return 0;
+}
+
+int nmdShutdown(struct NativeMiniDfsCluster *cl) {
+    return nmdShutdownInner(cl, 0);
+}
+
+int nmdShutdownClean(struct NativeMiniDfsCluster *cl) {
+    return nmdShutdownInner(cl, 1);
 }
 
 int nmdWaitClusterUp(struct NativeMiniDfsCluster *cl)

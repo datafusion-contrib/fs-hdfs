@@ -26,9 +26,14 @@ extern  "C" {
 #endif
 
 struct hdfsBuilder;
+/**
+* <div rustbindgen replaces="MiniDfsCluster"></div>
+*/
 struct NativeMiniDfsCluster; 
 
 /**
+ * <div rustbindgen replaces="MiniDfsConf"></div>
+ *
  * Represents a configuration to use for creating a Native MiniDFSCluster
  */
 struct NativeMiniDfsConf {
@@ -81,6 +86,16 @@ int nmdWaitClusterUp(struct NativeMiniDfsCluster *cl);
  *                  thrown.
  */
 int nmdShutdown(struct NativeMiniDfsCluster *cl);
+
+/**
+ * Shut down a NativeMiniDFS cluster with deleting hdfs directory
+ *
+ * @param cl        The cluster
+ *
+ * @return          0 on success; a non-zero error code if an exception is
+ *                  thrown.
+ */
+int nmdShutdownClean(struct NativeMiniDfsCluster *cl);
 
 /**
  * Destroy a Native MiniDFSCluster

@@ -285,17 +285,13 @@ extern  "C" {
      *
      * @param bld  The HDFS builder
      * @param nn   The NameNode to use.
-     *
      *             If the string given is 'default', the default NameNode
      *             configuration will be used (from the XML configuration files)
-     *
      *             If NULL is given, a LocalFileSystem will be created.
-     *
      *             If the string starts with a protocol type such as file:// or
      *             hdfs://, this protocol type will be used.  If not, the
      *             hdfs:// protocol type will be used.
-     *
-     *             You may specify a NameNode port in the usual way by 
+     *             You may specify a NameNode port in the usual way by
      *             passing a string of the format hdfs://<hostname>:<port>.
      *             Alternately, you may set the port with
      *             hdfsBuilderSetNameNodePort.  However, you must not pass the
@@ -1000,7 +996,6 @@ extern  "C" {
      *                   hadoopRzBufferGet.  If you have reached EOF, the data
      *                   within the hadoopRzBuffer will be NULL.  You must still
      *                   free hadoopRzBuffer instances containing NULL.
-     *
      *                   On failure, we will return NULL plus an errno code.
      *                   errno = EOPNOTSUPP indicates that we could not do a
      *                   zero-copy read, and there was no ByteBufferPool
