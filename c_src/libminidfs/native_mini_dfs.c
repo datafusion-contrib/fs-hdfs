@@ -103,7 +103,7 @@ static jthrowable nmdConfigureShortCircuit(JNIEnv *env,
     return NULL;
 }
 
-struct NativeMiniDfsCluster* nmdCreate(struct NativeMiniDfsConf *conf)
+struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf)
 {
     struct NativeMiniDfsCluster* cl = NULL;
     jobject bld = NULL, cobj = NULL, cluster = NULL;
@@ -355,4 +355,34 @@ const char *hdfsGetDomainSocketPath(const struct NativeMiniDfsCluster *cl) {
     }
 
     return NULL;
+}
+
+int nmdConfigureHdfsBuilder(struct NativeMiniDfsCluster *cl,
+                            struct hdfsBuilder *bld) {
+    int ret;
+    tPort port;
+    const char *domainSocket;
+
+    hdfsBuilderSetNameNode(bld, "localhost");
+    port = (tPort) nmdGetNameNodePort(cl);
+    if (port < 0) {
+        fprintf(stderr, "nmdGetNameNodePort failed with error %d\n", -port);
+        return EIO;
+    }
+    hdfsBuilderSetNameNodePort(bld, port);
+
+    domainSocket = hdfsGetDomainSocketPath(cl);
+
+    if (domainSocket) {
+        ret = hdfsBuilderConfSetStr(bld, "dfs.client.read.shortcircuit", "true");
+        if (ret) {
+            return ret;
+        }
+        ret = hdfsBuilderConfSetStr(bld, "dfs.domain.socket.path",
+                                    domainSocket);
+        if (ret) {
+            return ret;
+        }
+    }
+    return 0;
 }

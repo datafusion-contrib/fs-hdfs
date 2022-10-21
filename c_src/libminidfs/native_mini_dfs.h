@@ -60,7 +60,7 @@ struct NativeMiniDfsConf {
  *
  * @return      a NativeMiniDfsBuilder, or a NULL pointer on error.
  */
-struct NativeMiniDfsCluster* nmdCreate(struct NativeMiniDfsConf *conf);
+struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf);
 
 /**
  * Wait until a MiniDFSCluster comes out of safe mode.
@@ -121,6 +121,16 @@ int nmdGetNameNodeHttpAddress(const struct NativeMiniDfsCluster *cl,
  * @return          A const string of domain socket path, or NULL if not set.
  */
 const char *hdfsGetDomainSocketPath(const struct NativeMiniDfsCluster *cl);
+
+/**
+ * Configure the HDFS builder appropriately to connect to this cluster.
+ *
+ * @param bld       The hdfs builder
+ *
+ * @return          the port, or a negative error code
+ */
+int nmdConfigureHdfsBuilder(struct NativeMiniDfsCluster *cl,
+                            struct hdfsBuilder *bld);
 
 #ifdef __cplusplus
 }
