@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! fs-hdfs is a library for accessing to HDFS cluster.
+//! fs-hdfs3 is a library for accessing to HDFS cluster.
 //! Basically, it provides libhdfs FFI APIs.
 //! It also provides more idiomatic and abstract Rust APIs,
 //! hiding manual memory management and some thread-safety problem of libhdfs.
@@ -36,12 +36,12 @@
 //!
 //! ```ignore
 //! [dependencies]
-//! fs-hdfs = "0.1.9"
+//! fs-hdfs3 = "0.1.9"
 //! ```
 //! or
 //!
 //! ```ignore
-//! [dependencies.fs-hdfs]
+//! [dependencies.fs-hdfs3]
 //! git = "https://github.com/datafusion-contrib/fs-hdfs"
 //! ```
 //!
