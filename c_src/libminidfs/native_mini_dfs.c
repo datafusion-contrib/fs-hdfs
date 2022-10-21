@@ -41,8 +41,6 @@
 #define HADOOP_NAMENODE "org/apache/hadoop/hdfs/server/namenode/NameNode"
 #define JAVA_INETSOCKETADDRESS "java/net/InetSocketAddress"
 
-#define DFS_WEBHDFS_ENABLED_KEY "dfs.webhdfs.enabled"
-
 struct NativeMiniDfsCluster {
     /**
      * The NativeMiniDfsCluster object
@@ -105,7 +103,7 @@ static jthrowable nmdConfigureShortCircuit(JNIEnv *env,
     return NULL;
 }
 
-struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf)
+struct NativeMiniDfsCluster* nmdCreate(struct NativeMiniDfsConf *conf)
 {
     struct NativeMiniDfsCluster* cl = NULL;
     jobject bld = NULL, cobj = NULL, cluster = NULL;
@@ -128,22 +126,6 @@ struct NativeMiniDfsCluster* nmdCreate(const struct NativeMiniDfsConf *conf)
         printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
             "nmdCreate: new Configuration");
         goto error;
-    }
-    if (conf->webhdfsEnabled) {
-        jthr = newJavaStr(env, DFS_WEBHDFS_ENABLED_KEY, &jconfStr);
-        if (jthr) {
-            printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
-                                  "nmdCreate: new String");
-            goto error;
-        }
-        jthr = invokeMethod(env, NULL, INSTANCE, cobj, HADOOP_CONF,
-                            "setBoolean", "(Ljava/lang/String;Z)V",
-                            jconfStr, conf->webhdfsEnabled);
-        if (jthr) {
-            printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
-                                  "nmdCreate: Configuration::setBoolean");
-            goto error;
-        }
     }
     if (jthr) {
         printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
@@ -242,7 +224,7 @@ void nmdFree(struct NativeMiniDfsCluster* cl)
     free(cl);
 }
 
-int nmdShutdownInner(struct NativeMiniDfsCluster* cl, jboolean deleteDfsDir)
+int nmdShutdown(struct NativeMiniDfsCluster* cl)
 {
     JNIEnv *env = getJNIEnv();
     jthrowable jthr;
@@ -252,21 +234,13 @@ int nmdShutdownInner(struct NativeMiniDfsCluster* cl, jboolean deleteDfsDir)
         return -EIO;
     }
     jthr = invokeMethod(env, NULL, INSTANCE, cl->obj,
-            MINIDFS_CLUSTER, "shutdown", "(Z)V", deleteDfsDir);
+            MINIDFS_CLUSTER, "shutdown", "()V");
     if (jthr) {
         printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
             "nmdShutdown: MiniDFSCluster#shutdown");
         return -EIO;
     }
     return 0;
-}
-
-int nmdShutdown(struct NativeMiniDfsCluster *cl) {
-    return nmdShutdownInner(cl, 0);
-}
-
-int nmdShutdownClean(struct NativeMiniDfsCluster *cl) {
-    return nmdShutdownInner(cl, 1);
 }
 
 int nmdWaitClusterUp(struct NativeMiniDfsCluster *cl)
@@ -381,35 +355,4 @@ const char *hdfsGetDomainSocketPath(const struct NativeMiniDfsCluster *cl) {
     }
 
     return NULL;
-}
-
-int nmdConfigureHdfsBuilder(struct NativeMiniDfsCluster *cl,
-                            struct hdfsBuilder *bld) {
-    int ret;
-    tPort port;
-    const char *domainSocket;
-
-    hdfsBuilderSetNameNode(bld, "localhost");
-    port = (tPort) nmdGetNameNodePort(cl);
-    // Don't need this because always false
-//    if (port < 0) {
-//        fprintf(stderr, "nmdGetNameNodePort failed with error %d\n", -port);
-//        return EIO;
-//    }
-    hdfsBuilderSetNameNodePort(bld, port);
-
-    domainSocket = hdfsGetDomainSocketPath(cl);
-
-    if (domainSocket) {
-        ret = hdfsBuilderConfSetStr(bld, "dfs.client.read.shortcircuit", "true");
-        if (ret) {
-            return ret;
-        }
-        ret = hdfsBuilderConfSetStr(bld, "dfs.domain.socket.path",
-                                    domainSocket);
-        if (ret) {
-            return ret;
-        }
-    }
-    return 0;
 }

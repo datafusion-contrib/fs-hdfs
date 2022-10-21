@@ -26,7 +26,15 @@
 #include <stdarg.h>
 #include <errno.h>
 
-#define PATH_SEPARATOR ':'
+#ifdef WIN32
+    #define PATH_SEPARATOR ';'
+    #define PATH_SEPARATOR_STR ";"
+#else
+    #define PATH_SEPARATOR ':'
+    #define PATH_SEPARATOR_STR ":"
+#endif
+
+// #define _LIBHDFS_JNI_HELPER_DEBUGGING_ON_
 
 #ifdef WIN32
 #ifdef LIBHDFS_DLL_EXPORT
@@ -108,11 +116,11 @@ jthrowable invokeMethod(JNIEnv *env, jvalue *retval, MethType methType,
                  const char *methSignature, ...);
 
 LIBHDFS_EXTERNAL
-jthrowable constructNewObjectOfClass(JNIEnv *env, jobject *out, const char *className, 
+jthrowable constructNewObjectOfClass(JNIEnv *env, jobject *out, const char *className,
                                   const char *ctorSignature, ...);
 
 LIBHDFS_EXTERNAL
-jthrowable methodIdFromClass(const char *className, const char *methName, 
+jthrowable methodIdFromClass(const char *className, const char *methName,
                             const char *methSignature, MethType methType, 
                             JNIEnv *env, jmethodID *out);
 
@@ -130,6 +138,8 @@ LIBHDFS_EXTERNAL
 jthrowable classNameOfObject(jobject jobj, JNIEnv *env, char **name);
 
 /** getJNIEnv: A helper function to get the JNIEnv* for the given thread.
+ * It gets this from the ThreadLocalState if it exists. If a ThreadLocalState
+ * does not exist, one will be created.
  * If no JVM exists, then one will be created. JVM command line arguments
  * are obtained from the LIBHDFS_OPTS environment variable.
  * @param: None.
@@ -137,6 +147,42 @@ jthrowable classNameOfObject(jobject jobj, JNIEnv *env, char **name);
  * */
 LIBHDFS_EXTERNAL
 JNIEnv* getJNIEnv(void);
+
+/**
+ * Get the last exception root cause that happened in the context of the
+ * current thread.
+ *
+ * The pointer returned by this function is guaranteed to be valid until
+ * the next call to invokeMethod() by the current thread.
+ * Users of this function should not free the pointer.
+ *
+ * @return The root cause as a C-string.
+ */
+LIBHDFS_EXTERNAL
+char* getLastTLSExceptionRootCause();
+
+/**
+ * Get the last exception stack trace that happened in the context of the
+ * current thread.
+ *
+ * The pointer returned by this function is guaranteed to be valid until
+ * the next call to invokeMethod() by the current thread.
+ * Users of this function should not free the pointer.
+ *
+ * @return The stack trace as a C-string.
+ */
+LIBHDFS_EXTERNAL
+char* getLastTLSExceptionStackTrace();
+
+/** setTLSExceptionStrings: Sets the 'rootCause' and 'stackTrace' in the
+ * ThreadLocalState if one exists for the current thread.
+ *
+ * @param rootCause A string containing the root cause of an exception.
+ * @param stackTrace A string containing the stack trace of an exception.
+ * @return None.
+ */
+LIBHDFS_EXTERNAL
+void setTLSExceptionStrings(const char *rootCause, const char *stackTrace);
 
 /**
  * Figure out if a Java object is an instance of a particular class.
