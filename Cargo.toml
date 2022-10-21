@@ -1,5 +1,5 @@
 [package]
-name = "fs-hdfs"
+name = "fs-hdfs3"
 version = "0.1.9"
 edition = "2021"
 
@@ -8,7 +8,7 @@ authors = ["Yanghong Zhong <nju_yaho@apache.org>"]
 license = "Apache-2.0"
 
 keywords = ["hdfs", "hadoop"]
-documentation = "https://docs.rs/crate/fs-hdfs"
+documentation = "https://docs.rs/crate/fs-hdfs3"
 homepage = "https://github.com/datafusion-contrib/fs-hdfs"
 repository = "https://github.com/datafusion-contrib/fs-hdfs"
 readme = "README.md"
