@@ -22,25 +22,18 @@ Add this to your Cargo.toml:
 fs-hdfs3 = "0.1.9"
 ```
 
-Firstly, we need to add library path for the jvm related dependencies. An example for MacOS,
+### Build
 
-```sh
-export DYLD_LIBRARY_PATH=$JAVA_HOME/jre/lib/server
-```
-For Centos
-```sh
-export LD_LIBRARY_PATH=$JAVA_HOME/jre/lib/amd64/server
-```
+We need to specify ```$JAVA_HOME``` to make Java shared library available for building.
 
-Here, ``$JAVA_HOME`` need to be specified and exported.
-
+### Run
 Since our compiled libhdfs is JNI native implementation, it requires the proper ``CLASSPATH``. An example,
 
 ```sh
 export CLASSPATH=$CLASSPATH:`hadoop classpath --glob`
 ```
 
-## Testing
+### Testing
 The test also requires the ``CLASSPATH``. In case that the java class of ``org.junit.Assert`` can't be found. Refine the ``$CLASSPATH`` as follows:
 
 ```sh
