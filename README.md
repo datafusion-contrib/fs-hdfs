@@ -21,27 +21,44 @@ Add this to your Cargo.toml:
 [dependencies]
 fs-hdfs = "0.1.9"
 ```
+### Build
 
-Firstly, we need to add library path for the jvm related dependencies. An example for MacOS,
+We need to specify ```$JAVA_HOME``` to make Java shared library available for building.
 
-```sh
-export DYLD_LIBRARY_PATH=$JAVA_HOME/jre/lib/server
-```
-For Centos
-```sh
-export LD_LIBRARY_PATH=$JAVA_HOME/jre/lib/amd64/server
-```
-
-Here, ``$JAVA_HOME`` need to be specified and exported.
-
-Since our compiled libhdfs is JNI native implementation, it requires the proper ``CLASSPATH``. An example,
+### Run
+Since our compiled libhdfs is JNI-based implementation,
+it requires Hadoop-related classes available through ``CLASSPATH``. An example,
 
 ```sh
 export CLASSPATH=$CLASSPATH:`hadoop classpath --glob`
 ```
 
-## Testing
-The test also requires the ``CLASSPATH``. In case that the java class of ``org.junit.Assert`` can't be found. Refine the ``$CLASSPATH`` as follows:
+Also, we need to specify the JVM dynamic library path for the application to load the JVM shared library at runtime.
+
+For jdk8 and macOS, it's
+
+```sh
+export DYLD_LIBRARY_PATH=$JAVA_HOME/jre/lib/server
+```
+
+For jdk11 (or later jdks) and macOS, it's
+
+```sh
+export DYLD_LIBRARY_PATH=$JAVA_HOME/lib/server
+```
+
+For jdk8 and Centos
+```sh
+export LD_LIBRARY_PATH=$JAVA_HOME/jre/lib/amd64/server
+```
+
+For jdk11 (or later jdks) and Centos
+```sh
+export LD_LIBRARY_PATH=$JAVA_HOME/lib/server
+```
+
+### Testing
+The test also requires the ``CLASSPATH`` and `DYLD_LIBRARY_PATH` (or `LD_LIBRARY_PATH`). In case that the java class of ``org.junit.Assert`` can't be found. Refine the ``$CLASSPATH`` as follows:
 
 ```sh
 export CLASSPATH=$CLASSPATH:`hadoop classpath --glob`:$HADOOP_HOME/share/hadoop/tools/lib/*
