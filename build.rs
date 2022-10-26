@@ -126,7 +126,10 @@ fn get_java_dependency() -> Vec<String> {
             if cfg!(target_os = "linux") {
                 result.push(format!("-I{}/include/linux", val));
                 // for openjdk 8
-                println!("cargo:rustc-link-search=native={}/jre/lib/amd64/server", val);
+                println!(
+                    "cargo:rustc-link-search=native={}/jre/lib/amd64/server",
+                    val
+                );
                 // for openjdk 11, etc.
                 println!("cargo:rustc-link-search=native={}/lib/server", val)
             } else if cfg!(target_os = "macos") {
