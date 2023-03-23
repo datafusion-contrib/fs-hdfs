@@ -173,7 +173,7 @@ impl HdfsFs {
     /// Create HdfsFile from hdfsFile
     fn new_hdfs_file(&self, path: &str, file: hdfsFile) -> Result<HdfsFile, HdfsErr> {
         if file.is_null() {
-            Err(HdfsErr::Generic(format!(
+            Err(HdfsErr::FileNotFound(format!(
                 "Fail to create/open file {}",
                 path
             )))
@@ -222,7 +222,7 @@ impl HdfsFs {
         };
 
         if ptr.is_null() {
-            Err(HdfsErr::Generic(format!(
+            Err(HdfsErr::FileNotFound(format!(
                 "Fail to get file status for {}",
                 path
             )))
@@ -647,23 +647,27 @@ impl HdfsFile {
 
     /// Write data into an open file.
     pub fn write(&self, buf: &[u8]) -> Result<i32, HdfsErr> {
-        let written_len = unsafe {
-            hdfsWrite(
-                self.fs.raw,
-                self.file,
-                buf.as_ptr() as *mut c_void,
-                buf.len() as tSize,
-            )
-        };
+        let mut write_buf = buf;
+        while !write_buf.is_empty() {
+            let written_len = unsafe {
+                hdfsWrite(
+                    self.fs.raw,
+                    self.file,
+                    write_buf.as_ptr() as *mut c_void,
+                    write_buf.len() as tSize,
+                )
+            };
 
-        if written_len > 0 {
-            Ok(written_len)
-        } else {
-            Err(HdfsErr::Generic(format!(
-                "Fail to write contents to file {}",
-                self.path()
-            )))
+            if written_len > 0 {
+                write_buf = &write_buf[written_len as usize..];
+            } else {
+                return Err(HdfsErr::Generic(format!(
+                    "Fail to write contents to file {}",
+                    self.path()
+                )));
+            }
         }
+        Ok(buf.len() as i32)
     }
 }
 
