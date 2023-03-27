@@ -647,27 +647,26 @@ impl HdfsFile {
 
     /// Write data into an open file.
     pub fn write(&self, buf: &[u8]) -> Result<i32, HdfsErr> {
-        let mut write_buf = buf;
-        while !write_buf.is_empty() {
-            let written_len = unsafe {
-                hdfsWrite(
-                    self.fs.raw,
-                    self.file,
-                    write_buf.as_ptr() as *mut c_void,
-                    write_buf.len() as tSize,
-                )
-            };
-
-            if written_len > 0 {
-                write_buf = &write_buf[written_len as usize..];
-            } else {
-                return Err(HdfsErr::Generic(format!(
-                    "Fail to write contents to file {}",
-                    self.path()
-                )));
-            }
+        if buf.is_empty() {
+            return Ok(0);
         }
-        Ok(buf.len() as i32)
+        let written_len = unsafe {
+            hdfsWrite(
+                self.fs.raw,
+                self.file,
+                buf.as_ptr() as *mut c_void,
+                buf.len() as tSize,
+            )
+        };
+
+        if written_len > 0 {
+            Ok(written_len as i32)
+        } else {
+            return Err(HdfsErr::Generic(format!(
+                "Fail to write contents to file {}",
+                self.path()
+            )));
+        }
     }
 }
 
