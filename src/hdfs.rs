@@ -459,7 +459,7 @@ impl HdfsFs {
     pub fn set_replication(&self, path: &str, num: i16) -> Result<bool, HdfsErr> {
         if unsafe {
             let cstr_path = CString::new(path).unwrap();
-            hdfsSetReplication(self.raw, cstr_path.as_ptr(), num as i16)
+            hdfsSetReplication(self.raw, cstr_path.as_ptr(), num)
         } == 0
         {
             Ok(true)
@@ -609,7 +609,7 @@ impl HdfsFile {
         };
 
         if read_len >= 0 {
-            Ok(read_len as i32)
+            Ok(read_len)
         } else {
             Err(HdfsErr::Generic(format!(
                 "Fail to read contents from {} with return code {}",
@@ -635,7 +635,7 @@ impl HdfsFile {
         };
 
         if read_len >= 0 {
-            Ok(read_len as i32)
+            Ok(read_len)
         } else {
             Err(HdfsErr::Generic(format!(
                 "Fail to read contents from {} with offset {} and return code {}",
@@ -759,7 +759,7 @@ impl FileStatus {
     /// Get the permissions associated with the file
     #[inline]
     pub fn permission(&self) -> i16 {
-        unsafe { &*self.ptr() }.mPermissions as i16
+        unsafe { &*self.ptr() }.mPermissions
     }
 
     /// Get the length of this file, in bytes.
@@ -778,7 +778,7 @@ impl FileStatus {
     /// Get the replication factor of a file.
     #[inline]
     pub fn replica_count(&self) -> i16 {
-        unsafe { &*self.ptr() }.mReplication as i16
+        unsafe { &*self.ptr() }.mReplication
     }
 
     /// Get the last modification time for the file in seconds

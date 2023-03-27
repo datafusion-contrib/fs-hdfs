@@ -83,7 +83,7 @@ impl MiniDFS {
     }
 
     pub fn namenode_port(&self) -> Option<i32> {
-        match unsafe { nmdGetNameNodePort(self.cluster) as i32 } {
+        match unsafe { nmdGetNameNodePort(self.cluster) } {
             val if val > 0 => Some(val),
             _ => None,
         }
@@ -107,7 +107,7 @@ impl MiniDFS {
                 let slice = unsafe { ffi::CStr::from_ptr(hostname) }.to_bytes();
                 let str = str::from_utf8(slice).unwrap();
 
-                Some((str, port as i32))
+                Some((str, port))
             }
             _ => None,
         }
