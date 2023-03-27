@@ -259,7 +259,7 @@ impl HdfsFs {
     pub fn default_blocksize(&self) -> Result<usize, HdfsErr> {
         let block_sz = unsafe { hdfsGetDefaultBlockSize(self.raw) };
 
-        if block_sz > 0 {
+        if block_sz >= 0 {
             Ok(block_sz as usize)
         } else {
             Err(HdfsErr::Generic(
@@ -275,7 +275,7 @@ impl HdfsFs {
             hdfsGetDefaultBlockSizeAtPath(self.raw, cstr_path.as_ptr())
         };
 
-        if block_sz > 0 {
+        if block_sz >= 0 {
             Ok(block_sz as usize)
         } else {
             Err(HdfsErr::Generic(format!(
@@ -287,10 +287,10 @@ impl HdfsFs {
 
     /// Return the raw capacity of the filesystem.
     pub fn capacity(&self) -> Result<usize, HdfsErr> {
-        let block_sz = unsafe { hdfsGetCapacity(self.raw) };
+        let capacity = unsafe { hdfsGetCapacity(self.raw) };
 
-        if block_sz > 0 {
-            Ok(block_sz as usize)
+        if capacity >= 0 {
+            Ok(capacity as usize)
         } else {
             Err(HdfsErr::Generic("Fail to get capacity".to_owned()))
         }
@@ -298,10 +298,10 @@ impl HdfsFs {
 
     /// Return the total raw size of all files in the filesystem.
     pub fn used(&self) -> Result<usize, HdfsErr> {
-        let block_sz = unsafe { hdfsGetUsed(self.raw) };
+        let used = unsafe { hdfsGetUsed(self.raw) };
 
-        if block_sz > 0 {
-            Ok(block_sz as usize)
+        if used >= 0 {
+            Ok(used as usize)
         } else {
             Err(HdfsErr::Generic("Fail to get used size".to_owned()))
         }
@@ -459,7 +459,7 @@ impl HdfsFs {
     pub fn set_replication(&self, path: &str, num: i16) -> Result<bool, HdfsErr> {
         if unsafe {
             let cstr_path = CString::new(path).unwrap();
-            hdfsSetReplication(self.raw, cstr_path.as_ptr(), num as i16)
+            hdfsSetReplication(self.raw, cstr_path.as_ptr(), num)
         } == 0
         {
             Ok(true)
@@ -584,7 +584,7 @@ impl HdfsFile {
     pub fn pos(&self) -> Result<u64, HdfsErr> {
         let pos = unsafe { hdfsTell(self.fs.raw, self.file) };
 
-        if pos > 0 {
+        if pos >= 0 {
             Ok(pos as u64)
         } else {
             Err(HdfsErr::Generic(format!(
@@ -596,6 +596,9 @@ impl HdfsFile {
 
     /// Read data from an open file.
     pub fn read(&self, buf: &mut [u8]) -> Result<i32, HdfsErr> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let read_len = unsafe {
             hdfsRead(
                 self.fs.raw,
@@ -605,8 +608,8 @@ impl HdfsFile {
             )
         };
 
-        if read_len > 0 {
-            Ok(read_len as i32)
+        if read_len >= 0 {
+            Ok(read_len)
         } else {
             Err(HdfsErr::Generic(format!(
                 "Fail to read contents from {} with return code {}",
@@ -618,6 +621,9 @@ impl HdfsFile {
 
     /// Positional read of data from an open file.
     pub fn read_with_pos(&self, pos: i64, buf: &mut [u8]) -> Result<i32, HdfsErr> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let read_len = unsafe {
             hdfsPread(
                 self.fs.raw,
@@ -628,8 +634,8 @@ impl HdfsFile {
             )
         };
 
-        if read_len > 0 {
-            Ok(read_len as i32)
+        if read_len >= 0 {
+            Ok(read_len)
         } else {
             Err(HdfsErr::Generic(format!(
                 "Fail to read contents from {} with offset {} and return code {}",
@@ -659,7 +665,7 @@ impl HdfsFile {
             )
         };
 
-        if written_len > 0 {
+        if written_len >= 0 {
             Ok(written_len)
         } else {
             Err(HdfsErr::Generic(format!(
@@ -753,7 +759,7 @@ impl FileStatus {
     /// Get the permissions associated with the file
     #[inline]
     pub fn permission(&self) -> i16 {
-        unsafe { &*self.ptr() }.mPermissions as i16
+        unsafe { &*self.ptr() }.mPermissions
     }
 
     /// Get the length of this file, in bytes.
@@ -772,7 +778,7 @@ impl FileStatus {
     /// Get the replication factor of a file.
     #[inline]
     pub fn replica_count(&self) -> i16 {
-        unsafe { &*self.ptr() }.mReplication as i16
+        unsafe { &*self.ptr() }.mReplication
     }
 
     /// Get the last modification time for the file in seconds
