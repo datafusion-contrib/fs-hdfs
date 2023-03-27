@@ -660,12 +660,12 @@ impl HdfsFile {
         };
 
         if written_len > 0 {
-            Ok(written_len as i32)
+            Ok(written_len)
         } else {
-            return Err(HdfsErr::Generic(format!(
+            Err(HdfsErr::Generic(format!(
                 "Fail to write contents to file {}",
                 self.path()
-            )));
+            )))
         }
     }
 }
