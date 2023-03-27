@@ -24,7 +24,7 @@ use_existing_hdfs = []
 
 [build-dependencies]
 cc = "1.0"
-bindgen = "^0.59"
+bindgen = "0.64.0"
 
 [dependencies]
 lazy_static = "^1.4"
