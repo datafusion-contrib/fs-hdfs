@@ -173,7 +173,7 @@ impl HdfsFs {
     /// Create HdfsFile from hdfsFile
     fn new_hdfs_file(&self, path: &str, file: hdfsFile) -> Result<HdfsFile, HdfsErr> {
         if file.is_null() {
-            Err(HdfsErr::Generic(format!(
+            Err(HdfsErr::FileNotFound(format!(
                 "Fail to create/open file {}",
                 path
             )))
@@ -222,7 +222,7 @@ impl HdfsFs {
         };
 
         if ptr.is_null() {
-            Err(HdfsErr::Generic(format!(
+            Err(HdfsErr::FileNotFound(format!(
                 "Fail to get file status for {}",
                 path
             )))
@@ -647,6 +647,9 @@ impl HdfsFile {
 
     /// Write data into an open file.
     pub fn write(&self, buf: &[u8]) -> Result<i32, HdfsErr> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let written_len = unsafe {
             hdfsWrite(
                 self.fs.raw,
