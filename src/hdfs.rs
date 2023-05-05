@@ -32,9 +32,10 @@ use url::Url;
 pub use crate::err::HdfsErr;
 use crate::native::*;
 
+/// These flags should be consistent with the ones in fcntl.h
 const O_RDONLY: c_int = 0;
 const O_WRONLY: c_int = 1;
-const O_APPEND: c_int = 1024;
+const O_APPEND: c_int = 8;
 
 lazy_static! {
     static ref HDFS_MANAGER: HdfsManager = HdfsManager::new();
@@ -1011,6 +1012,53 @@ mod test {
                 // Clean up
                 assert!(fs.delete(&test_dir, true).is_ok());
             }
+        }
+    }
+
+    #[test]
+    fn test_write_read() {
+        let dfs = get_dfs();
+        let fs = dfs.get_hdfs().ok().unwrap();
+
+        let data = "Hello World!!!".as_bytes();
+
+        let uuid = Uuid::new_v4().to_string();
+        let test_file = uuid.as_str();
+
+        // Test write to hadoop file
+        {
+            // create a file, check existence, and close
+            let created_file = match fs.create(test_file) {
+                Ok(f) => f,
+                Err(_) => panic!("Couldn't create a hdfs file"),
+            };
+            match created_file.write(data) {
+                Ok(len) => assert_eq!(len as usize, data.len()),
+                Err(_) => panic!("Couldn't write contents to a hdfs file"),
+            }
+            assert!(created_file.close().is_ok());
+        };
+
+        // Test read
+        {
+            assert!(fs.exist(test_file));
+
+            // open a file, read and close
+            let opened_file = fs.open(test_file).ok().unwrap();
+            let mut buf = vec![0u8; data.len()];
+            assert!(opened_file.read(&mut buf).is_ok());
+            assert_eq!(data, buf);
+            assert!(opened_file.close().is_ok());
+
+            // open a file, read_with_pos and close
+            let opened_file = fs.open(test_file).ok().unwrap();
+            let mut buf = vec![0u8; data.len()];
+            assert!(opened_file.read_with_pos(0, &mut buf).is_ok());
+            assert_eq!(data, buf);
+            assert!(opened_file.close().is_ok());
+
+            // Clean up
+            assert!(fs.delete(test_file, false).is_ok());
         }
     }
 }
