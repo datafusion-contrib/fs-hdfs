@@ -19,7 +19,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-fs-hdfs3 = "0.1.11"
+fs-hdfs3 = "0.1.12"
 ```
 
 ### Build
