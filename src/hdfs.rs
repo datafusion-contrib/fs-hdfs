@@ -417,7 +417,7 @@ impl HdfsFs {
 
         let file = unsafe {
             let cstr_path = CString::new(path).unwrap();
-            hdfsOpenFile(self.raw, cstr_path.as_ptr(), O_APPEND, 0, 0, 0)
+            hdfsOpenFile(self.raw, cstr_path.as_ptr(), O_APPEND | O_WRONLY, 0, 0, 0)
         };
 
         self.new_hdfs_file(path, file)
@@ -1028,7 +1028,7 @@ mod test {
         // Test write to hadoop file
         {
             // create a file, check existence, and close
-            let created_file = match fs.create(test_file) {
+            let created_file = match fs.create_with_params(test_file, false, 0, 1, 0) {
                 Ok(f) => f,
                 Err(_) => panic!("Couldn't create a hdfs file"),
             };
@@ -1039,26 +1039,44 @@ mod test {
             assert!(created_file.close().is_ok());
         };
 
+        // Test append to hadoop file
+        {
+            // create a file, check existence, and close
+            let appended_file = match fs.append(test_file) {
+                Ok(f) => f,
+                Err(_) => panic!("Couldn't create a hdfs file"),
+            };
+            match appended_file.write(data) {
+                Ok(len) => assert_eq!(len as usize, data.len()),
+                Err(_) => panic!("Couldn't write contents to a hdfs file"),
+            }
+            assert!(appended_file.close().is_ok());
+        };
+
         // Test read
         {
             assert!(fs.exist(test_file));
 
-            // open a file, read and close
+            let mut data2 = vec![];
+            data2.append(&mut data.to_vec());
+            data2.append(&mut data.to_vec());
+
+            // open a file, read, check the contents and close
             let opened_file = fs.open(test_file).ok().unwrap();
-            let mut buf = vec![0u8; data.len()];
+            let mut buf = vec![0u8; data2.len()];
             assert!(opened_file.read(&mut buf).is_ok());
-            assert_eq!(data, buf);
+            assert_eq!(data2, buf);
             assert!(opened_file.close().is_ok());
 
-            // open a file, read_with_pos and close
+            // open a file, read_with_pos, check the contents and close
             let opened_file = fs.open(test_file).ok().unwrap();
-            let mut buf = vec![0u8; data.len()];
+            let mut buf = vec![0u8; data2.len()];
             assert!(opened_file.read_with_pos(0, &mut buf).is_ok());
-            assert_eq!(data, buf);
+            assert_eq!(data2, buf);
             assert!(opened_file.close().is_ok());
-
-            // Clean up
-            assert!(fs.delete(test_file, false).is_ok());
         }
+
+        // Clean up
+        assert!(fs.delete(test_file, false).is_ok());
     }
 }
