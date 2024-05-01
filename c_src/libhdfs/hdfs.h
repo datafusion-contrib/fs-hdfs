@@ -712,6 +712,16 @@ extern  "C" {
     LIBHDFS_EXTERNAL
     int hdfsRename(hdfsFS fs, const char* oldPath, const char* newPath);
 
+    /**
+     * hdfsRename - Rename file and overwrite if exists.
+     * @param fs The configured filesystem handle.
+     * @param oldPath The path of the source file.
+     * @param newPath The path of the destination file.
+     * @return Returns 0 on success, -1 on error.
+     */
+    LIBHDFS_EXTERNAL
+    int hdfsRenameOverwrite(hdfsFS fs, const char* oldPath, const char* newPath);
+
 
     /** 
      * hdfsGetWorkingDirectory - Get the current working directory for
