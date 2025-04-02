@@ -120,32 +120,21 @@ fn get_build_flags() -> Vec<String> {
 fn get_java_dependency() -> Vec<String> {
     let mut result = vec![];
 
-    match env::var("JAVA_HOME") {
-        Ok(val) => {
-            result.push(format!("-I{}/include", val));
-            if cfg!(target_os = "linux") {
-                result.push(format!("-I{}/include/linux", val));
-                // for openjdk 8
-                println!(
-                    "cargo:rustc-link-search=native={}/jre/lib/amd64/server",
-                    val
-                );
-                // for openjdk 11, etc.
-                println!("cargo:rustc-link-search=native={}/lib/server", val)
-            } else if cfg!(target_os = "macos") {
-                result.push(format!("-I{}/include/darwin", val));
-                // for openjdk 8
-                println!("cargo:rustc-link-search=native={}/jre/lib/server", val);
-                // for openjdk 11, etc.
-                println!("cargo:rustc-link-search=native={}/lib/server", val);
-            }
-            // Tell cargo to tell rustc to link the system jvm shared library.
-            println!("cargo:rustc-link-lib=jvm");
-        }
-        Err(e) => {
-            panic!("JAVA_HOME shell environment must be set: {}", e);
-        }
-    }
+    // Include directories
+    let java_home = java_locator::locate_java_home()
+        .expect("JAVA_HOME could not be found, trying setting the variable manually");
+    result.push(format!("-I{java_home}/include"));
+    #[cfg(target_os = "linux")]
+    result.push(format!("-I{java_home}/include/linux"));
+
+    // libjvm link
+    let jvm_lib_location = java_locator::locate_jvm_dyn_library().unwrap();
+    println!("cargo:rustc-link-search=native={}", jvm_lib_location);
+    println!("cargo:rustc-link-lib=jvm");
+
+    // For tests, add libjvm path to rpath, this does not propagate upwards,
+    // unless building an .so, as per Cargo specs, so is only used when testing
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{jvm_lib_location}");
 
     result
 }
