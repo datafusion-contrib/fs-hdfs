@@ -126,6 +126,8 @@ fn get_java_dependency() -> Vec<String> {
     result.push(format!("-I{java_home}/include"));
     #[cfg(target_os = "linux")]
     result.push(format!("-I{java_home}/include/linux"));
+    #[cfg(target_os = "macos")]
+    result.push(format!("-I{java_home}/include/darwin"));
 
     // libjvm link
     let jvm_lib_location = java_locator::locate_jvm_dyn_library().unwrap();
