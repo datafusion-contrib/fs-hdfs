@@ -440,11 +440,15 @@ impl HdfsFs {
     }
 
     /// Rename file.
-    pub fn rename(&self, old_path: &str, new_path: &str) -> Result<bool, HdfsErr> {
+    pub fn rename(&self, old_path: &str, new_path: &str, overwrite: bool) -> Result<bool, HdfsErr> {
         if unsafe {
             let cstr_old_path = CString::new(old_path).unwrap();
             let cstr_new_path = CString::new(new_path).unwrap();
-            hdfsRename(self.raw, cstr_old_path.as_ptr(), cstr_new_path.as_ptr())
+            if overwrite {
+                hdfsRenameOverwrite(self.raw, cstr_old_path.as_ptr(), cstr_new_path.as_ptr())
+            } else {
+                hdfsRename(self.raw, cstr_old_path.as_ptr(), cstr_new_path.as_ptr())
+            }
         } == 0
         {
             Ok(true)

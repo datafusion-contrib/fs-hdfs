@@ -42,6 +42,7 @@
 #define JAVA_NET_URI    "java/net/URI"
 #define JAVA_STRING     "java/lang/String"
 #define READ_OPTION     "org/apache/hadoop/fs/ReadOption"
+#define RENAME_OPTION   "org/apache/hadoop/fs/Options$Rename"
 
 #define JAVA_VOID       "V"
 
@@ -2022,6 +2023,82 @@ int hdfsRename(hdfsFS fs, const char *oldPath, const char *newPath)
 done:
     destroyLocalReference(env, jOldPath);
     destroyLocalReference(env, jNewPath);
+    return ret;
+}
+
+int hdfsRenameOverwrite(hdfsFS fs, const char *oldPath, const char *newPath)
+{
+    // JAVA EQUIVALENT:
+    //  Path old = new Path(oldPath);
+    //  Path new = new Path(newPath);
+    //  fs.rename(old, new, overwrite = true);
+
+    jobject jFS = (jobject)fs;
+    jthrowable jthr;
+    jobject jOldPath = NULL, jNewPath = NULL;
+    int ret = -1;
+    jvalue jVal;
+    jobject enumInst = NULL, enumSetObj = NULL;
+
+    //Get the JNIEnv* corresponding to current thread
+    JNIEnv* env = getJNIEnv();
+    if (env == NULL) {
+      errno = EINTERNAL;
+      return -1;
+    }
+
+    jthr = fetchEnumInstance(env, RENAME_OPTION,
+              "OVERWRITE", &enumInst);
+    if (jthr) {
+        errno = printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
+            "hdfsRename: fetchEnumInstance(" RENAME_OPTION ", OVERWRITE)");
+        goto done;
+    }
+    jthr = invokeMethod(env, &jVal, STATIC, NULL,
+            "java/util/EnumSet", "of",
+            "(Ljava/lang/Enum;)Ljava/util/EnumSet;", enumInst);
+    if (jthr) {
+        goto done;
+    }
+    enumSetObj = jVal.l;
+
+    jclass enumSetClass = (*env)->FindClass(env, "java/util/EnumSet");
+    jmethodID toArrayTypedMethodID = (*env)->GetMethodID(env, enumSetClass, "toArray", "([Ljava/lang/Object;)[Ljava/lang/Object;");
+    jclass renameOptionClass = (*env)->FindClass(env, "org/apache/hadoop/fs/Options$Rename");
+    jobjectArray typedArray = (*env)->NewObjectArray(env, 1, renameOptionClass, NULL);
+    jobjectArray enumArray = (jobjectArray)(*env)->CallObjectMethod(env, enumSetObj, toArrayTypedMethodID, typedArray);
+
+    jthr = constructNewObjectOfPath(env, oldPath, &jOldPath);
+    if (jthr) {
+        errno = printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
+            "hdfsRename: constructNewObjectOfPath(%s)", oldPath);
+        goto done;
+    }
+    jthr = constructNewObjectOfPath(env, newPath, &jNewPath);
+    if (jthr) {
+        errno = printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
+            "hdfsRename: constructNewObjectOfPath(%s)", newPath);
+        goto done;
+    }
+
+    // Rename the file
+    // TODO: use rename2 here?  (See HDFS-3592)
+    jthr = invokeMethod(env, &jVal, INSTANCE, jFS, HADOOP_FS, "rename",
+                     "(Lorg/apache/hadoop/fs/Path;Lorg/apache/hadoop/fs/Path;[Lorg/apache/hadoop/fs/Options$Rename;)V",
+                     jOldPath, jNewPath, enumArray);
+    if (jthr) {
+        errno = printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
+            "hdfsRename(oldPath=%s, newPath=%s): FileSystem#rename",
+            oldPath, newPath);
+        goto done;
+    }
+    ret = 0;
+
+done:
+    destroyLocalReference(env, jOldPath);
+    destroyLocalReference(env, jNewPath);
+    destroyLocalReference(env, enumInst);
+    destroyLocalReference(env, enumSetObj);
     return ret;
 }
 
