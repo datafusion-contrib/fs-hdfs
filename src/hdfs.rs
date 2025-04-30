@@ -174,10 +174,7 @@ impl HdfsFs {
     /// Create HdfsFile from hdfsFile
     fn new_hdfs_file(&self, path: &str, file: hdfsFile) -> Result<HdfsFile, HdfsErr> {
         if file.is_null() {
-            Err(HdfsErr::FileNotFound(format!(
-                "Fail to create/open file {}",
-                path
-            )))
+            Err(HdfsErr::FileNotFound(path.to_owned()))
         } else {
             Ok(HdfsFile {
                 fs: self.clone(),
@@ -223,10 +220,7 @@ impl HdfsFs {
         };
 
         if ptr.is_null() {
-            Err(HdfsErr::FileNotFound(format!(
-                "Fail to get file status for {}",
-                path
-            )))
+            Err(HdfsErr::FileNotFound(path.to_owned()))
         } else {
             Ok(FileStatus::new(ptr))
         }
