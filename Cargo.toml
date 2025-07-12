@@ -21,6 +21,7 @@ path = "src/lib.rs"
 default = ["test_util"]
 test_util = []
 use_existing_hdfs = []
+no_jvm_invocation = []
 
 [build-dependencies]
 cc = "1"

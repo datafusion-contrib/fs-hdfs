@@ -138,10 +138,14 @@ LIBHDFS_EXTERNAL
 jthrowable classNameOfObject(jobject jobj, JNIEnv *env, char **name);
 
 /** getJNIEnv: A helper function to get the JNIEnv* for the given thread.
- * It gets this from the ThreadLocalState if it exists. If a ThreadLocalState
- * does not exist, one will be created.
- * If no JVM exists, then one will be created. JVM command line arguments
- * are obtained from the LIBHDFS_OPTS environment variable.
+ * 
+ * In regular mode: Gets JNIEnv from ThreadLocalState if it exists, otherwise
+ * creates one. If no JVM exists, creates one using LIBHDFS_OPTS environment variable.
+ * 
+ * In no_jvm_invocation mode: Uses JavaVM set via setJavaVM(). If the current thread
+ * is already attached by the caller, returns JNIEnv directly. If not attached,
+ * attaches the thread and stores JNIEnv in ThreadLocalState for proper cleanup.
+ * 
  * @param: None.
  * @return The JNIEnv* corresponding to the thread.
  * */
@@ -183,6 +187,19 @@ char* getLastTLSExceptionStackTrace();
  */
 LIBHDFS_EXTERNAL
 void setTLSExceptionStrings(const char *rootCause, const char *stackTrace);
+
+#ifdef LIBHDFS_NO_JVM_INVOCATION
+/** setJavaVM: Set the JavaVM for use in JNI context.
+ * This function should be called once at the beginning of the application
+ * to provide the JavaVM that was passed to the JNI library.
+ * The JavaVM will be cached and used to obtain JNIEnv for each thread.
+ *
+ * @param vm The JavaVM pointer from JNI context.
+ * @return 0 on success, -1 on error.
+ */
+LIBHDFS_EXTERNAL
+int setJavaVM(void *vm);
+#endif /* LIBHDFS_NO_JVM_INVOCATION */
 
 /**
  * Figure out if a Java object is an instance of a particular class.

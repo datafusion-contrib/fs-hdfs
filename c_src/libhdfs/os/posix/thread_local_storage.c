@@ -42,7 +42,7 @@ void hdfsThreadDestructor(void *v)
   JNIEnv *env = state->env;;
   jint ret;
 
-  /* Detach the current thread from the JVM */
+  /* Detach the current thread from the JVM if env is present (means WE attached it) */
   if (env) {
     ret = (*env)->GetJavaVM(env, &vm);
     if (ret) {
@@ -71,6 +71,7 @@ struct ThreadLocalState* threadLocalStorageCreate()
       "threadLocalStorageSet: OOM - Unable to allocate thread local state\n");
     return NULL;
   }
+  state->env = NULL;
   state->lastExceptionStackTrace = NULL;
   state->lastExceptionRootCause = NULL;
   return state;

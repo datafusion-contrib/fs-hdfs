@@ -112,3 +112,61 @@ pub mod minidfs;
 pub mod util;
 /// For list files in a directory recursively
 pub mod walkdir;
+
+#[cfg(feature = "no_jvm_invocation")]
+/// JNI context support for running inside JVM without invocation APIs
+pub mod jni_context {
+    //! This module provides support for using fs-hdfs3 within JNI native functions
+    //! where the JavaVM is provided by the calling JVM, eliminating the need for
+    //! JVM invocation APIs and linking to libjvm.so
+    //!
+    //! ## Usage in JNI Applications
+    //!
+    //! When implementing JNI native functions that use fs-hdfs3, call `set_java_vm()`
+    //! once at application startup with the JavaVM from your JNI context:
+    //!
+    //! ```c
+    //! // In your JNI_OnLoad function or early in your application
+    //! JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+    //!     if (set_java_vm_from_rust(vm) != 0) {
+    //!         return JNI_ERR;
+    //!     }
+    //!     return JNI_VERSION_1_8;
+    //! }
+    //!
+    //! // Later, in your JNI native functions, just use fs-hdfs3 normally
+    //! JNIEXPORT jint JNICALL
+    //! Java_com_example_MyClass_myNativeMethod(JNIEnv *env, jobject this) {
+    //!     // No need to set JNIEnv - fs-hdfs3 will get it from the JavaVM
+    //!     // Use fs-hdfs3 functions normally
+    //!     return 0;
+    //! }
+    //! ```
+
+    use crate::native::hdfsSetJavaVM;
+    use std::ffi::c_void;
+
+    /// Set the JavaVM for use in JNI context.
+    /// This function should be called once at application startup, typically
+    /// in JNI_OnLoad, to provide the JavaVM that fs-hdfs3 will use to obtain
+    /// JNIEnv for each thread.
+    ///
+    /// # Arguments
+    /// * `vm` - The JavaVM pointer from JNI context
+    ///
+    /// # Returns
+    /// * `Ok(())` on success
+    /// * `Err(())` on error
+    ///
+    /// # Safety
+    /// This function is unsafe because it accepts a raw pointer that must be a valid JavaVM.
+    /// The JavaVM must remain valid for the lifetime of the application.
+    pub unsafe fn set_java_vm(vm: *mut c_void) -> Result<(), ()> {
+        let result = hdfsSetJavaVM(vm);
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}

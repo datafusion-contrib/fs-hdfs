@@ -39,17 +39,22 @@ fn build_ffi(flags: &[String]) {
     );
 
     // To avoid the order issue of dependent dynamic libraries
+    #[cfg(not(feature = "no_jvm_invocation"))]
     println!("cargo:rustc-link-lib=jvm");
 
-    let bindings = bindgen::Builder::default()
+    let builder = bindgen::Builder::default()
         .header(header)
         .allowlist_function("nmd.*")
         .allowlist_function("hdfs.*")
         .allowlist_function("hadoop.*")
         .clang_args(flags)
-        .rustified_enum("tObjectKind")
-        .generate()
-        .expect("Unable to generate bindings");
+        .rustified_enum("tObjectKind");
+
+    // Add the conditional functions for no_jvm_invocation
+    #[cfg(feature = "no_jvm_invocation")]
+    let builder = builder.allowlist_function("hdfsSetJavaVM");
+
+    let bindings = builder.generate().expect("Unable to generate bindings");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
@@ -114,6 +119,9 @@ fn get_build_flags() -> Vec<String> {
     result.extend(get_java_dependency());
     result.push(String::from("-Wno-incompatible-pointer-types"));
 
+    #[cfg(feature = "no_jvm_invocation")]
+    result.push(String::from("-DLIBHDFS_NO_JVM_INVOCATION"));
+
     result
 }
 
@@ -129,14 +137,17 @@ fn get_java_dependency() -> Vec<String> {
     #[cfg(target_os = "macos")]
     result.push(format!("-I{java_home}/include/darwin"));
 
-    // libjvm link
-    let jvm_lib_location = java_locator::locate_jvm_dyn_library().unwrap();
-    println!("cargo:rustc-link-search=native={}", jvm_lib_location);
-    println!("cargo:rustc-link-lib=jvm");
+    #[cfg(not(feature = "no_jvm_invocation"))]
+    {
+        // libjvm link
+        let jvm_lib_location = java_locator::locate_jvm_dyn_library().unwrap();
+        println!("cargo:rustc-link-search=native={}", jvm_lib_location);
+        println!("cargo:rustc-link-lib=jvm");
 
-    // For tests, add libjvm path to rpath, this does not propagate upwards,
-    // unless building an .so, as per Cargo specs, so is only used when testing
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{jvm_lib_location}");
+        // For tests, add libjvm path to rpath, this does not propagate upwards,
+        // unless building an .so, as per Cargo specs, so is only used when testing
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{jvm_lib_location}");
+    }
 
     result
 }
