@@ -138,7 +138,6 @@ pub extern "C" fn Java_com_example_MyClass_myNativeMethod(
             return -1;
         }
     }
-    
     0
 }
 ```

@@ -824,10 +824,10 @@ fail:
 
 #else
 
-/* Global JavaVM for no_jvm_invocation mode - using atomic for efficiency 
- * 
+/* Global JavaVM for no_jvm_invocation mode - using atomic for efficiency
+ *
  * Memory ordering explanation:
- * - setJavaVM uses memory_order_release: ensures all prior writes are visible 
+ * - setJavaVM uses memory_order_release: ensures all prior writes are visible
  *   before the JavaVM pointer becomes visible to other threads
  * - getJNIEnvNoInvocation uses memory_order_acquire: ensures the JavaVM pointer
  *   load happens before any subsequent operations that depend on it
@@ -839,7 +839,7 @@ int setJavaVM(void *vm)
 {
     JavaVM *javaVM = (JavaVM *)vm;
     JavaVM *expected = NULL;
-    
+
     if (!vm) {
         fprintf(stderr, "setJavaVM: vm parameter cannot be NULL\n");
         return -1;
@@ -855,7 +855,7 @@ int setJavaVM(void *vm)
             return -1;
         }
     }
-    
+
     return 0;
 }
 
@@ -866,8 +866,8 @@ int setJavaVM(void *vm)
  * attaches the thread and stores JNIEnv in TLS for proper cleanup.
  *
  * Implementation note: we use POSIX thread-local storage (TLS) ONLY for threads
- * that WE attach (not caller-attached threads). This allows us to associate a 
- * destructor function with each thread, that will detach the thread from the Java VM 
+ * that WE attach (not caller-attached threads). This allows us to associate a
+ * destructor function with each thread, that will detach the thread from the Java VM
  * when the thread terminates. If we fail to do this, it will cause a memory leak.
  * The contract is: if state->env is not NULL, then WE attached this thread.
  *
@@ -885,13 +885,13 @@ JNIEnv* getJNIEnv(void)
     struct ThreadLocalState *state = NULL;
     JNIEnv *env = NULL;
     jint rv;
-    
+
     JavaVM *vm = atomic_load(&g_cachedJavaVM);
     if (vm == NULL) {
         fprintf(stderr, "getJNIEnv: JavaVM not set. Call setJavaVM() first.\n");
         return NULL;
     }
-    
+
     /* Check thread local storage first - if we have TLS with an env, we must have
      * attached this thread */
     THREAD_LOCAL_STORAGE_GET_QUICK(&state);
@@ -934,20 +934,18 @@ JNIEnv* getJNIEnv(void)
 
     /* Try to get JNIEnv from the JavaVM - this will succeed if the thread is already attached */
     rv = (*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_2);
-    
+
     if (rv == JNI_OK && env != NULL) {
         /* Thread is already attached by caller - return JNIEnv directly without storing in TLS */
         return env;
     } else if (rv == JNI_EDETACHED) {
         /* Thread is not attached - we need to attach it ourselves and store in TLS */
-        
-        /* Attach the current thread */
         rv = (*vm)->AttachCurrentThread(vm, (void**)&env, NULL);
         if (rv != JNI_OK || env == NULL) {
             fprintf(stderr, "getJNIEnv: AttachCurrentThread failed with error: %d\n", rv);
             return NULL;
         }
-        
+
         /* Store the JNIEnv we attached in the thread local state. The contract is that if
          * state->env is not NULL, then it MUST BE US who attached this thread. */
         state->env = env;
