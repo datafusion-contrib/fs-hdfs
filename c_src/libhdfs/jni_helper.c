@@ -759,15 +759,15 @@ static JNIEnv* getGlobalJNIEnv(void)
  * If no JVM exists, then one will be created. JVM command line arguments
  * are obtained from the LIBHDFS_OPTS environment variable.
  *
- * Implementation note: we rely on POSIX thread-local storage (TLS).
+ * Implementation note: we rely on POSIX thread-local storage (tls).
  * This allows us to associate a destructor function with each thread, that
- * will detach the thread from the Java VM when the thread terminates. If we
- * fail to do this, it will cause a memory leak.
+ * will detach the thread from the Java VM when the thread terminates.  If we
+ * failt to do this, it will cause a memory leak.
  *
- * However, POSIX TLS is not the most efficient way to do things. It requires a
- * key to be initialized before it can be used. Since we don't know if this key
+ * However, POSIX TLS is not the most efficient way to do things.  It requires a
+ * key to be initialized before it can be used.  Since we don't know if this key
  * is initialized at the start of this function, we have to lock a mutex first
- * and check. Luckily, most operating systems support the more efficient
+ * and check.  Luckily, most operating systems support the more efficient
  * __thread construct, which is initialized by the linker.
  *
  * @param: None.
@@ -810,17 +810,15 @@ JNIEnv* getJNIEnv(void)
     THREAD_LOCAL_STORAGE_SET_QUICK(state);
 
     state->env = getGlobalJNIEnv();
+    mutexUnlock(&jvmMutex);
     if (!state->env) {
       goto fail;
     }
-    mutexUnlock(&jvmMutex);
     return state->env;
 
 fail:
     fprintf(stderr, "getJNIEnv: getGlobalJNIEnv failed\n");
     hdfsThreadDestructor(state);
-    threadLocalStorageClear();
-    mutexUnlock(&jvmMutex);
     return NULL;
 }
 

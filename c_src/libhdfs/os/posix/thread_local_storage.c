@@ -105,10 +105,3 @@ int threadLocalStorageSet(struct ThreadLocalState *state)
   }
   return ret;
 }
-
-void threadLocalStorageClear()
-{
-  if (gTlsKeyInitialized) {
-    pthread_setspecific(gTlsKey, NULL);
-  }
-}
