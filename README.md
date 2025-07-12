@@ -85,3 +85,60 @@ match fs.mkdir("/data") {
     Err(_)  => { panic!("/data creation has failed") }
 };
 ```
+
+## JNI Context Support
+
+fs-hdfs3 supports a special `no_jvm_invocation` feature for use cases where the library runs within JNI native functions and JVM invocation APIs are not needed. This is useful when implementing Java libraries with native JNI modules that use fs-hdfs3 to call Hadoop FileSystem APIs.
+
+### Using the no_jvm_invocation Feature
+
+To use this feature, add it to your Cargo.toml:
+
+```toml
+[dependencies.fs-hdfs3]
+version = "0.1.12"
+features = ["no_jvm_invocation"]
+```
+
+When this feature is enabled:
+- The library does not link to `libjvm.so`
+- JVM invocation APIs are disabled
+- You must provide the JavaVM using the `jni_context` module functions
+
+### JNI Native Function Example
+
+```rust
+use fs_hdfs3::jni_context::set_java_vm;
+use fs_hdfs3::hdfs::get_hdfs;
+
+// Call this once at application startup, typically in JNI_OnLoad
+#[no_mangle]
+pub extern "C" fn JNI_OnLoad(vm: *mut std::ffi::c_void, _reserved: *mut std::ffi::c_void) -> i32 {
+    // Set the JavaVM for fs-hdfs3 to use
+    if unsafe { set_java_vm(vm) }.is_err() {
+        return -1; // JNI_ERR
+    }
+    0x00010008 // JNI_VERSION_1_8
+}
+
+// Later, in your JNI native functions, just use fs-hdfs3 normally
+#[no_mangle]
+pub extern "C" fn Java_com_example_MyClass_myNativeMethod(
+    _env: *mut std::ffi::c_void,
+    _class: *mut std::ffi::c_void,
+) -> i32 {
+    // No need to manage JNIEnv - fs-hdfs3 handles it automatically
+    match get_hdfs() {
+        Ok(fs) => {
+            // Use the filesystem...
+            println!("Successfully connected to HDFS");
+        }
+        Err(e) => {
+            eprintln!("Failed to connect to HDFS: {:?}", e);
+            return -1;
+        }
+    }
+    
+    0
+}
+```

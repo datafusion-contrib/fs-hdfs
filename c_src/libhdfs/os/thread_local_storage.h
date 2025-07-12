@@ -97,4 +97,9 @@ int threadLocalStorageGet(struct ThreadLocalState **state);
  */
 int threadLocalStorageSet(struct ThreadLocalState *state);
 
+/**
+ * Clears the thread-local storage for the current thread.
+ */
+void threadLocalStorageClear();
+
 #endif

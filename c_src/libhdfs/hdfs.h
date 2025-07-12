@@ -1079,6 +1079,11 @@ extern  "C" {
     LIBHDFS_EXTERNAL
     char* hdfsGetLastExceptionStackTrace();
 
+    #ifdef LIBHDFS_NO_JVM_INVOCATION
+    LIBHDFS_EXTERNAL
+    int hdfsSetJavaVM(void *vm);
+    #endif /* LIBHDFS_NO_JVM_INVOCATION */
+
 #ifdef __cplusplus
 }
 #endif

@@ -28,6 +28,7 @@
 #include <dirent.h>
 #include <stdio.h> 
 #include <string.h> 
+#include <stdatomic.h>
 
 static struct htable *gClassRefHTable = NULL;
 
@@ -629,6 +630,7 @@ static char* getClassPath()
     return expandedClasspath;
 }
 
+#ifndef LIBHDFS_NO_JVM_INVOCATION
 
 /**
  * Get the global JNI environemnt.
@@ -701,7 +703,7 @@ static JNIEnv* getGlobalJNIEnv(void)
         }
         options[0].optionString = optHadoopClassPath;
         hadoopJvmArgs = getenv("LIBHDFS_OPTS");
-	if (hadoopJvmArgs != NULL)  {
+        if (hadoopJvmArgs != NULL)  {
           hadoopJvmArgs = strdup(hadoopJvmArgs);
           for (noArgs = 1, str = hadoopJvmArgs; ; noArgs++, str = NULL) {
             token = strtok_r(str, jvmArgDelims, &savePtr);
@@ -757,15 +759,15 @@ static JNIEnv* getGlobalJNIEnv(void)
  * If no JVM exists, then one will be created. JVM command line arguments
  * are obtained from the LIBHDFS_OPTS environment variable.
  *
- * Implementation note: we rely on POSIX thread-local storage (tls).
+ * Implementation note: we rely on POSIX thread-local storage (TLS).
  * This allows us to associate a destructor function with each thread, that
- * will detach the thread from the Java VM when the thread terminates.  If we
- * failt to do this, it will cause a memory leak.
+ * will detach the thread from the Java VM when the thread terminates. If we
+ * fail to do this, it will cause a memory leak.
  *
- * However, POSIX TLS is not the most efficient way to do things.  It requires a
- * key to be initialized before it can be used.  Since we don't know if this key
+ * However, POSIX TLS is not the most efficient way to do things. It requires a
+ * key to be initialized before it can be used. Since we don't know if this key
  * is initialized at the start of this function, we have to lock a mutex first
- * and check.  Luckily, most operating systems support the more efficient
+ * and check. Luckily, most operating systems support the more efficient
  * __thread construct, which is initialized by the linker.
  *
  * @param: None.
@@ -808,17 +810,158 @@ JNIEnv* getJNIEnv(void)
     THREAD_LOCAL_STORAGE_SET_QUICK(state);
 
     state->env = getGlobalJNIEnv();
-    mutexUnlock(&jvmMutex);
     if (!state->env) {
       goto fail;
     }
+    mutexUnlock(&jvmMutex);
     return state->env;
 
 fail:
     fprintf(stderr, "getJNIEnv: getGlobalJNIEnv failed\n");
     hdfsThreadDestructor(state);
+    threadLocalStorageClear();
+    mutexUnlock(&jvmMutex);
     return NULL;
 }
+
+#else
+
+/* Global JavaVM for no_jvm_invocation mode - using atomic for efficiency 
+ * 
+ * Memory ordering explanation:
+ * - setJavaVM uses memory_order_release: ensures all prior writes are visible 
+ *   before the JavaVM pointer becomes visible to other threads
+ * - getJNIEnvNoInvocation uses memory_order_acquire: ensures the JavaVM pointer
+ *   load happens before any subsequent operations that depend on it
+ * - This provides safe publication of the JavaVM without expensive mutex locking
+ */
+static _Atomic(JavaVM*) g_cachedJavaVM = NULL;
+
+int setJavaVM(void *vm)
+{
+    JavaVM *javaVM = (JavaVM *)vm;
+    JavaVM *expected = NULL;
+    
+    if (!vm) {
+        fprintf(stderr, "setJavaVM: vm parameter cannot be NULL\n");
+        return -1;
+    }
+
+    /* Atomically set the JavaVM if it's not already set (compare-and-swap) */
+    if (!atomic_compare_exchange_strong(&g_cachedJavaVM, &expected, javaVM)) {
+        if (atomic_load(&g_cachedJavaVM) == javaVM) {
+            /* The same JavaVM is already set, so we ignore this call. */
+            return 0;
+        } else {
+            fprintf(stderr, "setJavaVM: JavaVM already set. Cannot call setJavaVM() with a different JavaVM.\n");
+            return -1;
+        }
+    }
+    
+    return 0;
+}
+
+/**
+ * getJNIEnv: A helper function to get the JNIEnv* for the given thread.
+ * Uses a JavaVM that was previously set via setJavaVM(). If the current thread
+ * is already attached by the caller, returns JNIEnv directly. If not attached,
+ * attaches the thread and stores JNIEnv in TLS for proper cleanup.
+ *
+ * Implementation note: we use POSIX thread-local storage (TLS) ONLY for threads
+ * that WE attach (not caller-attached threads). This allows us to associate a 
+ * destructor function with each thread, that will detach the thread from the Java VM 
+ * when the thread terminates. If we fail to do this, it will cause a memory leak.
+ * The contract is: if state->env is not NULL, then WE attached this thread.
+ *
+ * However, POSIX TLS is not the most efficient way to do things. It requires a
+ * key to be initialized before it can be used. Since we don't know if this key
+ * is initialized at the start of this function, we have to lock a mutex first
+ * and check. Luckily, most operating systems support the more efficient
+ * __thread construct, which is initialized by the linker.
+ *
+ * @param: None.
+ * @return The JNIEnv* corresponding to the thread.
+ */
+JNIEnv* getJNIEnv(void)
+{
+    struct ThreadLocalState *state = NULL;
+    JNIEnv *env = NULL;
+    jint rv;
+    
+    JavaVM *vm = atomic_load(&g_cachedJavaVM);
+    if (vm == NULL) {
+        fprintf(stderr, "getJNIEnv: JavaVM not set. Call setJavaVM() first.\n");
+        return NULL;
+    }
+    
+    /* Check thread local storage first - if we have TLS with an env, we must have
+     * attached this thread */
+    THREAD_LOCAL_STORAGE_GET_QUICK(&state);
+    if (state && state->env) return state->env;
+
+    mutexLock(&jvmMutex);
+    if (threadLocalStorageGet(&state)) {
+        mutexUnlock(&jvmMutex);
+        return NULL;
+    }
+    if (state) {
+        if (state->env) {
+            /* We have attached this thread before, so we can return the JNIEnv directly. */
+            mutexUnlock(&jvmMutex);
+
+            /* Free any stale exception strings */
+            free(state->lastExceptionRootCause);
+            free(state->lastExceptionStackTrace);
+            state->lastExceptionRootCause = NULL;
+            state->lastExceptionStackTrace = NULL;
+
+            return state->env;
+        }
+    } else {
+        /* Create a ThreadLocalState for this thread */
+        state = threadLocalStorageCreate();
+        if (!state) {
+            mutexUnlock(&jvmMutex);
+            fprintf(stderr, "getJNIEnv: Unable to create ThreadLocalState\n");
+            return NULL;
+        }
+        if (threadLocalStorageSet(state)) {
+            mutexUnlock(&jvmMutex);
+            fprintf(stderr, "getJNIEnv: Unable to set ThreadLocalState\n");
+            return NULL;
+        }
+        THREAD_LOCAL_STORAGE_SET_QUICK(state);
+        mutexUnlock(&jvmMutex);
+    }
+
+    /* Try to get JNIEnv from the JavaVM - this will succeed if the thread is already attached */
+    rv = (*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_2);
+    
+    if (rv == JNI_OK && env != NULL) {
+        /* Thread is already attached by caller - return JNIEnv directly without storing in TLS */
+        return env;
+    } else if (rv == JNI_EDETACHED) {
+        /* Thread is not attached - we need to attach it ourselves and store in TLS */
+        
+        /* Attach the current thread */
+        rv = (*vm)->AttachCurrentThread(vm, (void**)&env, NULL);
+        if (rv != JNI_OK || env == NULL) {
+            fprintf(stderr, "getJNIEnv: AttachCurrentThread failed with error: %d\n", rv);
+            return NULL;
+        }
+        
+        /* Store the JNIEnv we attached in the thread local state. The contract is that if
+         * state->env is not NULL, then it MUST BE US who attached this thread. */
+        state->env = env;
+        return env;
+    } else {
+        /* Some other error occurred */
+        fprintf(stderr, "getJNIEnv: JavaVM->GetEnv failed with error: %d\n", rv);
+        return NULL;
+    }
+}
+
+#endif /* LIBHDFS_NO_JVM_INVOCATION */
 
 char* getLastTLSExceptionRootCause()
 {
@@ -938,4 +1081,3 @@ jthrowable fetchEnumInstance(JNIEnv *env, const char *className,
     *out = jEnum;
     return NULL;
 }
-

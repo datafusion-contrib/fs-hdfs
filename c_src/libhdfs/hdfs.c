@@ -3600,6 +3600,13 @@ char* hdfsGetLastExceptionStackTrace()
   return getLastTLSExceptionStackTrace();
 }
 
+#ifdef LIBHDFS_NO_JVM_INVOCATION
+int hdfsSetJavaVM(void *vm)
+{
+  return setJavaVM(vm);
+}
+#endif /* LIBHDFS_NO_JVM_INVOCATION */
+
 /**
  * vim: ts=4: sw=4: et:
  */
