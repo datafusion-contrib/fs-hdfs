@@ -16,7 +16,7 @@
 // under the License.
 
 //! it's a modified version of hdfs-rs
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString};
 use std::fmt::Write;
 use std::fmt::{Debug, Formatter};
@@ -52,6 +52,14 @@ pub fn get_hdfs() -> Result<Arc<HdfsFs>, HdfsErr> {
     HDFS_MANAGER.get_hdfs_by_full_path("default")
 }
 
+/// Register the name of a new scheme that this implementation should allow. No validation is done.
+pub fn register_scheme(scheme: & 'static str) {
+    HDFS_MANAGER.register_scheme(scheme)
+}
+pub fn get_registered_schemes() -> HashSet<& 'static str> {
+    HDFS_MANAGER.hdfs_schemes.read().unwrap().clone()
+}
+
 /// Remove an instance of HdfsFs from the cache by a specified path with uri
 pub fn unload_hdfs_cache_by_full_path(
     path: &str,
@@ -64,16 +72,23 @@ pub fn unload_hdfs_cache(hdfs: Arc<HdfsFs>) -> Result<Option<Arc<HdfsFs>>, HdfsE
     HDFS_MANAGER.remove_hdfs(hdfs)
 }
 
+
+pub const LOCAL_FS_SCHEME: &str = "file";
+pub const HDFS_FS_SCHEME: &str = "hdfs";
+pub const VIEW_FS_SCHEME: &str = "viewfs";
+pub const initial_schemes: [&str; 3] = [LOCAL_FS_SCHEME, HDFS_FS_SCHEME, VIEW_FS_SCHEME];
 /// Hdfs manager
 /// All of the HdfsFs instances will be managed in a singleton HdfsManager
 struct HdfsManager {
     hdfs_cache: Arc<RwLock<HashMap<String, Arc<HdfsFs>>>>,
+    hdfs_schemes: Arc<RwLock<HashSet<& 'static str>>>,
 }
 
 impl HdfsManager {
     fn new() -> Self {
         Self {
             hdfs_cache: Arc::new(RwLock::new(HashMap::new())),
+            hdfs_schemes: Arc::new(RwLock::new(initial_schemes.into_iter().collect()))
         }
     }
 
@@ -139,6 +154,12 @@ impl HdfsManager {
     fn remove_hdfs_inner(&self, hdfs_key: &str) -> Result<Option<Arc<HdfsFs>>, HdfsErr> {
         let mut cache = self.hdfs_cache.write().unwrap();
         Ok(cache.remove(hdfs_key))
+    }
+    fn register_scheme(&self, scheme: & 'static str) {
+        let mut hdfs_schemes = self.hdfs_schemes.write().unwrap();
+        if !hdfs_schemes.contains(scheme) {
+            hdfs_schemes.insert(scheme);
+        }
     }
 }
 
@@ -838,20 +859,16 @@ impl Drop for BlockHosts {
     }
 }
 
-pub const LOCAL_FS_SCHEME: &str = "file";
-pub const HDFS_FS_SCHEME: &str = "hdfs";
-pub const VIEW_FS_SCHEME: &str = "viewfs";
-
 #[inline]
 fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
+    let schemes = HDFS_MANAGER.hdfs_schemes.read().unwrap();
     match Url::parse(path) {
         Ok(url) => match url.scheme() {
             LOCAL_FS_SCHEME => Ok("file:///".to_string()),
-            HDFS_FS_SCHEME | VIEW_FS_SCHEME => {
+            scheme if schemes.contains(&scheme) => {
                 if let Some(host) = url.host() {
                     let mut uri_builder = String::new();
                     write!(&mut uri_builder, "{}://{}", url.scheme(), host).unwrap();
-
                     if let Some(port) = url.port() {
                         write!(&mut uri_builder, ":{}", port).unwrap();
                     }
@@ -860,7 +877,9 @@ fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
                     Err(HdfsErr::InvalidUrl(path.to_string()))
                 }
             }
-            _ => Err(HdfsErr::InvalidUrl(path.to_string())),
+            _ => {
+                Err(HdfsErr::InvalidUrl(path.to_string()))
+            }
         },
         Err(_) => Err(HdfsErr::InvalidUrl(path.to_string())),
     }
@@ -868,6 +887,7 @@ fn get_namenode_uri(path: &str) -> Result<String, HdfsErr> {
 
 #[inline]
 pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
+    let schemes = HDFS_MANAGER.hdfs_schemes.read().unwrap();
     let path = if path.starts_with('/') {
         format!("{}://{}", LOCAL_FS_SCHEME, path)
     } else {
@@ -875,7 +895,7 @@ pub fn get_uri(path: &str) -> Result<String, HdfsErr> {
     };
     match Url::parse(&path) {
         Ok(url) => match url.scheme() {
-            LOCAL_FS_SCHEME | HDFS_FS_SCHEME | VIEW_FS_SCHEME => Ok(url.to_string()),
+            scheme if schemes.contains(&scheme) => Ok(url.to_string()),
             _ => Err(HdfsErr::InvalidUrl(path.to_string())),
         },
         Err(_) => Err(HdfsErr::InvalidUrl(path.to_string())),

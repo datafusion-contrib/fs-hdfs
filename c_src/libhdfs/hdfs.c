@@ -58,7 +58,7 @@
 // Bit fields for hdfsFile_internal flags
 #define HDFS_FILE_SUPPORTS_DIRECT_READ (1<<0)
 
-tSize readDirect(hdfsFS fs, hdfsFile f, void* buffer, tSize length);
+tSize readDirect(hdfsFS fs, hdfsFile f, void* buffer, tSize length, int noPrintFlag);
 static void hdfsFreeFileInfoEntry(hdfsFileInfo *hdfsFileInfo);
 
 /**
@@ -1174,7 +1174,7 @@ static hdfsFile hdfsOpenFileImpl(hdfsFS fs, const char *path, int flags,
     if ((flags & O_WRONLY) == 0) {
         // Try a test read to see if we can do direct reads
         char buf;
-        if (readDirect(fs, file, &buf, 0) == 0) {
+        if (readDirect(fs, file, &buf, 0, NOPRINT_UNSUPPORTED_OPERATION) == 0) {
             // Success - 0-byte read should return 0
             file->flags |= HDFS_FILE_SUPPORTS_DIRECT_READ;
         } else if (errno != ENOTSUP) {
@@ -1409,7 +1409,7 @@ tSize hdfsRead(hdfsFS fs, hdfsFile f, void* buffer, tSize length)
         return -1;
     }
     if (f->flags & HDFS_FILE_SUPPORTS_DIRECT_READ) {
-      return readDirect(fs, f, buffer, length);
+      return readDirect(fs, f, buffer, length, PRINT_EXC_ALL);
     }
 
     // JAVA EQUIVALENT:
@@ -1464,7 +1464,7 @@ tSize hdfsRead(hdfsFS fs, hdfsFile f, void* buffer, tSize length)
 }
 
 // Reads using the read(ByteBuffer) API, which does fewer copies
-tSize readDirect(hdfsFS fs, hdfsFile f, void* buffer, tSize length)
+tSize readDirect(hdfsFS fs, hdfsFile f, void* buffer, tSize length, int noPrintFlags)
 {
     // JAVA EQUIVALENT:
     //  ByteBuffer bbuffer = ByteBuffer.allocateDirect(length) // wraps C buffer
@@ -1498,7 +1498,7 @@ tSize readDirect(hdfsFS fs, hdfsFile f, void* buffer, tSize length)
         HADOOP_ISTRM, "read", "(Ljava/nio/ByteBuffer;)I", bb);
     destroyLocalReference(env, bb);
     if (jthr) {
-        errno = printExceptionAndFree(env, jthr, PRINT_EXC_ALL,
+        errno = printExceptionAndFree(env, jthr, noPrintFlags,
             "readDirect: FSDataInputStream#read");
         return -1;
     }
