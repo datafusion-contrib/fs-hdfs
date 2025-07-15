@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: "*"
+  pull_request:
+    branches: "*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - hadoop_version: "3.3.6"
+            mockito_version: "3.12.4"
+          - hadoop_version: "3.3.4"
+            mockito_version: "3.12.4"
+          - hadoop_version: "3.4.1"
+            mockito_version: "3.12.4"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache downloaded archives
+        id: cache-archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            hadoop-${{ matrix.hadoop_version }}.tar.gz
+            lib/mockito-core-${{ matrix.mockito_version }}.jar
+          key: ${{ runner.os }}-archives-hadoop-${{ matrix.hadoop_version }}-mockito-${{ matrix.mockito_version }}
+
+      - name: Download Hadoop
+        if: steps.cache-archives.outputs.cache-hit != 'true'
+        run: wget https://archive.apache.org/dist/hadoop/common/hadoop-${{ matrix.hadoop_version }}/hadoop-${{ matrix.hadoop_version }}.tar.gz
+
+      - name: Download Mockito JAR
+        if: steps.cache-archives.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p lib
+          # This is required by MiniDFS but not provided by the hadoop distribution
+          wget -O lib/mockito-core-${{ matrix.mockito_version }}.jar https://repo1.maven.org/maven2/org/mockito/mockito-core/${{ matrix.mockito_version }}/mockito-core-${{ matrix.mockito_version }}.jar
+
+      - name: Set up Hadoop
+        run: |
+          tar -xzf hadoop-${{ matrix.hadoop_version }}.tar.gz
+          echo "HADOOP_HOME=$GITHUB_WORKSPACE/hadoop-${{ matrix.hadoop_version }}" >> $GITHUB_ENV
+          echo "HADOOP_CONF_DIR=$GITHUB_WORKSPACE/hadoop-${{ matrix.hadoop_version }}/etc/hadoop" >> $GITHUB_ENV
+
+      - name: Set environment variables for tests
+        run: |
+          echo "LD_LIBRARY_PATH=$JAVA_HOME/lib/server" >> $GITHUB_ENV
+          HADOOP_JARS=$($HADOOP_HOME/bin/hadoop classpath --glob)
+          TOOLS_JARS=$(echo $HADOOP_HOME/share/hadoop/tools/lib/*.jar | tr ' ' ':')
+          CUSTOM_JARS=$(echo $GITHUB_WORKSPACE/lib/*.jar | tr ' ' ':')
+          echo "CLASSPATH=$HADOOP_JARS:$TOOLS_JARS:$CUSTOM_JARS" >> $GITHUB_ENV
+
+      - name: Cache cargo registry and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-hadoop-${{ matrix.hadoop_version }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-cargo-
+
+      - name: Build
+        run: cargo build
+
+      - name: Test
+        run: cargo test

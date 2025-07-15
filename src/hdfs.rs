@@ -32,10 +32,10 @@ use url::Url;
 pub use crate::err::HdfsErr;
 use crate::native::*;
 
-/// These flags should be consistent with the ones in fcntl.h
-const O_RDONLY: c_int = 0;
-const O_WRONLY: c_int = 1;
-const O_APPEND: c_int = 8;
+/// File operation flags - using libc for cross-platform compatibility
+const O_RDONLY: c_int = libc::O_RDONLY;
+const O_WRONLY: c_int = libc::O_WRONLY;
+const O_APPEND: c_int = libc::O_APPEND;
 
 lazy_static! {
     static ref HDFS_MANAGER: HdfsManager = HdfsManager::new();
