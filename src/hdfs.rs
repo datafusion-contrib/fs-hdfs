@@ -66,6 +66,13 @@ pub fn get_hdfs_by_full_path(path: &str) -> Result<Arc<HdfsFs>, HdfsErr> {
     HDFS_MANAGER.get_hdfs_by_full_path(path)
 }
 
+pub fn get_hdfs_with_config(
+    path: &str,
+    config: Option<&HashMap<String, String>>,
+) -> Result<Arc<HdfsFs>, HdfsErr> {
+    HDFS_MANAGER.get_hdfs_by_full_path_with_config(path, config)
+}
+
 /// The default NameNode configuration will be used (from the XML configuration files)
 pub fn get_hdfs() -> Result<Arc<HdfsFs>, HdfsErr> {
     HDFS_MANAGER.get_hdfs_by_full_path("default")
@@ -96,10 +103,41 @@ impl HdfsManager {
         }
     }
 
-    fn get_hdfs_by_full_path(&self, path: &str) -> Result<Arc<HdfsFs>, HdfsErr> {
+    fn get_hdfs_by_full_path(
+        &self,
+        path: &str,
+    ) -> Result<Arc<HdfsFs>, HdfsErr> {
+        self.get_hdfs_by_full_path_with_config(path, None)
+    }
+
+    pub fn get_hdfs_by_full_path_with_config(
+        &self,
+        path: &str,
+        config: Option<&HashMap<String, String>>,
+    ) -> Result<Arc<HdfsFs>, HdfsErr> {
         let namenode_uri = match path {
             "default" => "default".to_owned(),
-            _ => get_namenode_uri(path)?,
+            _ => {
+                let parsed = Url::parse(path)
+                    .map_err(|e| HdfsErr::InvalidUrl(format!("{path}: {e}")))?;
+                match parsed.scheme() {
+                    "s3a" | "s3" => {
+                        let bucket = parsed.host_str().unwrap_or_default();
+                        if bucket.is_empty() {
+                            return Err(HdfsErr::InvalidUrl(format!(
+                                "S3 path missing bucket: {path}"
+                            )));
+                        }
+                        format!("{}://{}", parsed.scheme(), bucket)
+                    }
+                    "hdfs" | "viewfs" | "file" => get_namenode_uri(path)?,
+                    scheme => {
+                        return Err(HdfsErr::InvalidUrl(format!(
+                            "Unsupported scheme for get_hdfs_by_full_path: {scheme}"
+                        )))
+                    }
+                }
+            }
         };
 
         // Get if already exists
@@ -119,6 +157,11 @@ impl HdfsManager {
                 let hdfs_builder = hdfsNewBuilder();
                 let cstr_uri = CString::new(namenode_uri.as_bytes()).unwrap();
                 hdfsBuilderSetNameNode(hdfs_builder, cstr_uri.as_ptr());
+                if let Some(cfg) = config {
+                    for (k, v) in cfg {
+                        set_builder_conf(hdfs_builder, k, v)?;
+                    }
+                }
                 info!("Connecting to Namenode ({})", &namenode_uri);
                 hdfsBuilderConnect(hdfs_builder)
             };
@@ -188,39 +231,6 @@ impl HdfsFs {
     #[inline]
     pub fn raw(&self) -> hdfsFS {
         self.raw
-    }
-
-    pub fn connect_with_config(
-        nn: &str,
-        config: &HashMap<String, String>,
-    ) -> Result<Arc<Self>, HdfsErr> {
-        unsafe {
-            let builder = hdfsNewBuilder();
-            if builder.is_null() {
-                return Err(HdfsErr::Generic("Failed to create HDFS builder".to_string()));
-            }
-
-            let nn_c = CString::new(nn)
-                .map_err(|e| HdfsErr::Generic(format!("Invalid namenode URI: {e}")))?;
-            hdfsBuilderSetNameNode(builder, nn_c.as_ptr());
-
-            for (key, value) in config {
-                set_builder_conf(builder, key, value)?;
-            }
-
-            let fs = hdfsBuilderConnect(builder);
-            if fs.is_null() {
-                Err(HdfsErr::CannotConnectToNameNode(nn.to_string()))
-            } else {
-                let hdfs_fs = Arc::new(HdfsFs {
-                    url: nn.to_string(),
-                    raw: fs,
-                    _marker: std::marker::PhantomData,
-                });
-
-                Ok(hdfs_fs)
-            }
-        }
     }
 
     /// Create HdfsFile from hdfsFile
@@ -939,7 +949,7 @@ mod test {
     use uuid::Uuid;
 
     use crate::minidfs::get_dfs;
-    use crate::hdfs::HdfsFs;
+    use crate::hdfs::HDFS_MANAGER;
     use std::collections::HashMap;
 
     #[cfg(feature = "use_existing_hdfs")]
@@ -1145,7 +1155,8 @@ mod test {
         config.insert("fs.s3a.access.key".to_string(), "xxx".to_string());
         config.insert("fs.s3a.secret.key".to_string(), "yyy".to_string());
 
-        let result = HdfsFs::connect_with_config("default", &config);
+        let result = HDFS_MANAGER.get_hdfs_by_full_path_with_config("default", Some(&config));
+
         match result {
             Ok(ref fs) => println!("Successfully connected to HDFS with config: {:?}", fs.url),
             Err(e) => panic!("Failed to connect: {:?}", e),
