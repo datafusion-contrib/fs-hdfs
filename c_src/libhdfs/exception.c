@@ -81,7 +81,7 @@ static const struct ExceptionInfo gExceptionInfo[] = {
     },
     {
         "java.lang.UnsupportedOperationException",
-        0,
+        NOPRINT_UNSUPPORTED_OPERATION,
         ENOTSUP,
     },
     {
